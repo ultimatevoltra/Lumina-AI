@@ -1,0 +1,1737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lumina AI - Photo & Video Generation</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --secondary: #ec4899;
+            --accent: #06b6d4;
+            --bg-dark: #0a0a0f;
+            --bg-card: #12121a;
+            --bg-elevated: #1a1a2e;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --border: #2d2d44;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --gradient-1: linear-gradient(135deg, #6366f1 0%, #ec4899 100%);
+            --gradient-2: linear-gradient(135deg, #06b6d4 0%, #6366f1 100%);
+            --glass: rgba(255, 255, 255, 0.05);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+
+        /* Animated Background */
+        .bg-animation {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            overflow: hidden;
+        }
+
+        .bg-animation .orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.4;
+            animation: float 20s infinite ease-in-out;
+        }
+
+        .orb-1 {
+            width: 400px;
+            height: 400px;
+            background: var(--primary);
+            top: -100px;
+            left: -100px;
+            animation-delay: 0s;
+        }
+
+        .orb-2 {
+            width: 300px;
+            height: 300px;
+            background: var(--secondary);
+            top: 50%;
+            right: -50px;
+            animation-delay: -5s;
+        }
+
+        .orb-3 {
+            width: 350px;
+            height: 350px;
+            background: var(--accent);
+            bottom: -100px;
+            left: 30%;
+            animation-delay: -10s;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            33% { transform: translate(30px, -30px) scale(1.1); }
+            66% { transform: translate(-20px, 20px) scale(0.9); }
+        }
+
+        /* Navigation */
+        nav {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            padding: 1rem 2rem;
+            background: rgba(10, 10, 15, 0.8);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+            z-index: 1000;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.8rem;
+            font-weight: 700;
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .logo i {
+            font-size: 1.5rem;
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            list-style: none;
+        }
+
+        .nav-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .nav-links a:hover, .nav-links a.active {
+            color: var(--text-primary);
+        }
+
+        .nav-links a::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: var(--gradient-1);
+            transition: width 0.3s;
+        }
+
+        .nav-links a:hover::after, .nav-links a.active::after {
+            width: 100%;
+        }
+
+        .nav-auth {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .btn {
+            padding: 0.6rem 1.5rem;
+            border-radius: 12px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.9rem;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+        }
+
+        .btn-outline:hover {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.1);
+        }
+
+        .btn-primary {
+            background: var(--gradient-1);
+            color: white;
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 25px rgba(99, 102, 241, 0.6);
+        }
+
+        .btn-glow {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-glow::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
+            transform: rotate(45deg);
+            animation: shimmer 3s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%) rotate(45deg); }
+            100% { transform: translateX(100%) rotate(45deg); }
+        }
+
+        /* Main Content */
+        main {
+            padding-top: 80px;
+            min-height: 100vh;
+        }
+
+        .section {
+            display: none;
+            padding: 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .section.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Hero Section */
+        .hero {
+            text-align: center;
+            padding: 4rem 2rem;
+        }
+
+        .hero h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 4rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, #fff 0%, #a5b4fc 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero p {
+            font-size: 1.2rem;
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin: 0 auto 2rem;
+            line-height: 1.6;
+        }
+
+        .hero-stats {
+            display: flex;
+            justify-content: center;
+            gap: 3rem;
+            margin-top: 3rem;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        /* Generator Cards */
+        .generators-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+
+        .generator-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 2rem;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .generator-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--gradient-1);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .generator-card:hover::before {
+            opacity: 1;
+        }
+
+        .generator-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--primary);
+            box-shadow: 0 20px 40px rgba(99, 102, 241, 0.2);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .card-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 16px;
+            background: var(--gradient-1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+
+        .card-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .card-subtitle {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        /* Input Area */
+        .input-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .prompt-input {
+            width: 100%;
+            padding: 1rem;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            font-size: 1rem;
+            resize: vertical;
+            min-height: 100px;
+            transition: all 0.3s;
+        }
+
+        .prompt-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+        }
+
+        .prompt-input::placeholder {
+            color: #475569;
+        }
+
+        /* Model Selector */
+        .model-selector {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .model-option {
+            padding: 0.75rem;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .model-option:hover {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.1);
+        }
+
+        .model-option.selected {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.2);
+        }
+
+        .model-option.locked {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .model-option .lock-icon {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            font-size: 0.7rem;
+            color: var(--warning);
+        }
+
+        .model-name {
+            font-weight: 600;
+            font-size: 0.85rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .model-tag {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+        }
+
+        /* Generate Button */
+        .generate-btn {
+            width: 100%;
+            padding: 1rem;
+            font-size: 1.1rem;
+            margin-top: 1rem;
+        }
+
+        /* Output Area */
+        .output-area {
+            margin-top: 2rem;
+            min-height: 300px;
+            background: var(--bg-elevated);
+            border: 2px dashed var(--border);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .output-placeholder {
+            text-align: center;
+            color: var(--text-secondary);
+        }
+
+        .output-placeholder i {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        .output-image, .output-video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 16px;
+        }
+
+        .output-actions {
+            position: absolute;
+            bottom: 1rem;
+            right: 1rem;
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .action-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid var(--border);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            backdrop-filter: blur(10px);
+        }
+
+        .action-btn:hover {
+            background: var(--primary);
+            transform: scale(1.1);
+        }
+
+        /* History Grid */
+        .history-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .history-item {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            overflow: hidden;
+            transition: all 0.3s;
+        }
+
+        .history-item:hover {
+            transform: translateY(-5px);
+            border-color: var(--primary);
+        }
+
+        .history-thumb {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            background: var(--bg-elevated);
+        }
+
+        .history-info {
+            padding: 1rem;
+        }
+
+        .history-prompt {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .history-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .history-type {
+            padding: 0.25rem 0.5rem;
+            border-radius: 6px;
+            background: var(--primary);
+            color: white;
+            font-weight: 600;
+        }
+
+        /* Contact Section */
+        .contact-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .contact-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 3rem;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .contact-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(99, 102, 241, 0.1) 0%, transparent 70%);
+            animation: rotate 20s linear infinite;
+        }
+
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .contact-avatar {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: var(--gradient-1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+            margin: 0 auto 1.5rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        .contact-name {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        .contact-role {
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        .contact-links {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        .contact-link {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem 1.5rem;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: var(--text-primary);
+            text-decoration: none;
+            transition: all 0.3s;
+        }
+
+        .contact-link:hover {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.1);
+            transform: translateX(5px);
+        }
+
+        .contact-link i {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            background: var(--gradient-1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            animation: fadeIn 0.3s;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 2.5rem;
+            width: 90%;
+            max-width: 450px;
+            position: relative;
+            animation: slideUp 0.4s ease;
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .modal-close:hover {
+            background: var(--danger);
+            color: white;
+        }
+
+        .modal h2 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.8rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .modal-subtitle {
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 0.875rem 1rem;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            font-size: 0.95rem;
+            transition: all 0.3s;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+        }
+
+        .form-submit {
+            width: 100%;
+            padding: 1rem;
+            margin-top: 1rem;
+            font-size: 1rem;
+        }
+
+        .modal-footer {
+            text-align: center;
+            margin-top: 1.5rem;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .modal-footer a {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        /* User Badge */
+        .user-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.5rem 1rem;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            border-radius: 100px;
+        }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--gradient-1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 0.8rem;
+        }
+
+        .user-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .user-name {
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+
+        .user-status {
+            font-size: 0.7rem;
+            color: var(--success);
+        }
+
+        /* Limit Badge */
+        .limit-badge {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            padding: 1rem 1.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            z-index: 100;
+            animation: slideIn 0.5s ease;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        .limit-title {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .limit-bar {
+            width: 200px;
+            height: 6px;
+            background: var(--bg-elevated);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .limit-progress {
+            height: 100%;
+            background: var(--gradient-1);
+            border-radius: 3px;
+            transition: width 0.3s;
+        }
+
+        .limit-text {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-top: 0.5rem;
+        }
+
+        /* NSFW Warning */
+        .nsfw-warning {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid var(--danger);
+            border-radius: 12px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            color: var(--danger);
+        }
+
+        /* Loading Animation */
+        .loading-spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Toast Notification */
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            padding: 1rem 2rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            z-index: 3000;
+            opacity: 0;
+            transition: all 0.3s;
+        }
+
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+
+        .toast-success {
+            border-color: var(--success);
+            color: var(--success);
+        }
+
+        .toast-error {
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 2.5rem;
+            }
+
+            .generators-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .nav-links {
+                display: none;
+            }
+
+            .hero-stats {
+                flex-direction: column;
+                gap: 1.5rem;
+            }
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-dark);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--primary);
+        }
+    </style>
+</head>
+<body>
+    <!-- Background Animation -->
+    <div class="bg-animation">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+    </div>
+
+    <!-- Navigation -->
+    <nav>
+        <div class="logo">
+            <i class="fas fa-sparkles"></i>
+            Lumina AI
+        </div>
+
+        <ul class="nav-links">
+            <li><a href="#home" class="active" onclick="showSection('home')">Home</a></li>
+            <li><a href="#about" onclick="showSection('about')">About</a></li>
+            <li><a href="#history" onclick="showSection('history')">History</a></li>
+            <li><a href="#contact" onclick="showSection('contact')">Contact</a></li>
+        </ul>
+
+        <div class="nav-auth" id="navAuth">
+            <button class="btn btn-outline" onclick="openModal('login')">Log In</button>
+            <button class="btn btn-primary btn-glow" onclick="openModal('signup')">Sign Up</button>
+        </div>
+
+        <div class="user-badge" id="userBadge" style="display: none;">
+            <div class="user-avatar" id="userAvatar">U</div>
+            <div class="user-info">
+                <span class="user-name" id="userName">User</span>
+                <span class="user-status">● Online</span>
+            </div>
+            <button class="btn btn-outline" style="padding: 0.4rem 1rem; font-size: 0.8rem;" onclick="logout()">Logout</button>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main>
+        <!-- Home Section -->
+        <section id="home" class="section active">
+            <div class="hero">
+                <h1>Create with Lumina AI</h1>
+                <p>Transform your imagination into stunning photos and videos using state-of-the-art AI models. Professional quality, infinite possibilities.</p>
+                <button class="btn btn-primary btn-glow" style="padding: 1rem 2.5rem; font-size: 1.1rem;" onclick="scrollToGenerators()">
+                    Start Creating <i class="fas fa-arrow-right" style="margin-left: 0.5rem;"></i>
+                </button>
+
+                <div class="hero-stats">
+                    <div class="stat-item">
+                        <div class="stat-number">50+</div>
+                        <div class="stat-label">AI Models</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number">10M+</div>
+                        <div class="stat-label">Creations</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number">99.9%</div>
+                        <div class="stat-label">Uptime</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="generators-grid" id="generators">
+                <!-- Photo Generator -->
+                <div class="generator-card">
+                    <div class="card-header">
+                        <div class="card-icon">
+                            <i class="fas fa-image"></i>
+                        </div>
+                        <div>
+                            <div class="card-title">Photo Generation</div>
+                            <div class="card-subtitle">Create stunning images from text</div>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label>Enter your prompt</label>
+                        <textarea class="prompt-input" id="photoPrompt" placeholder="A futuristic cityscape at sunset with flying cars..."></textarea>
+                    </div>
+
+                    <div class="input-group">
+                        <label>Select Model</label>
+                        <div class="model-selector" id="photoModels">
+                            <div class="model-option selected" data-model="perchance" onclick="selectModel(this, 'photo')">
+                                <div class="model-name">Perchance</div>
+                                <div class="model-tag">Professional</div>
+                            </div>
+                            <div class="model-option" data-model="stable-xl" onclick="selectModel(this, 'photo')">
+                                <div class="model-name">Stable XL</div>
+                                <div class="model-tag">High Quality</div>
+                            </div>
+                            <div class="model-option" data-model="dalle-3" onclick="selectModel(this, 'photo')">
+                                <div class="model-name">DALL-E 3</div>
+                                <div class="model-tag">Creative</div>
+                            </div>
+                            <div class="model-option" data-model="midjourney" onclick="selectModel(this, 'photo')">
+                                <div class="model-name">Midjourney V6</div>
+                                <div class="model-tag">Artistic</div>
+                            </div>
+                            <div class="model-option locked" data-model="flux" onclick="selectModel(this, 'photo')">
+                                <div class="lock-icon"><i class="fas fa-lock"></i></div>
+                                <div class="model-name">Flux Pro</div>
+                                <div class="model-tag">Pro Only</div>
+                            </div>
+                            <div class="model-option locked" data-model="ideogram" onclick="selectModel(this, 'photo')">
+                                <div class="lock-icon"><i class="fas fa-lock"></i></div>
+                                <div class="model-name">Ideogram</div>
+                                <div class="model-tag">Pro Only</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-primary btn-glow generate-btn" onclick="generatePhoto()">
+                        <i class="fas fa-wand-magic-sparkles"></i> Generate Photo
+                    </button>
+
+                    <div class="output-area" id="photoOutput">
+                        <div class="output-placeholder">
+                            <i class="fas fa-image"></i>
+                            <p>Your generated image will appear here</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Video Generator -->
+                <div class="generator-card">
+                    <div class="card-header">
+                        <div class="card-icon" style="background: var(--gradient-2);">
+                            <i class="fas fa-video"></i>
+                        </div>
+                        <div>
+                            <div class="card-title">Video Generation</div>
+                            <div class="card-subtitle">Bring your ideas to life in motion</div>
+                        </div>
+                    </div>
+
+                    <div class="nsfw-warning" id="nsfwWarning" style="display: none;">
+                        <i class="fas fa-shield-halved"></i>
+                        <span>NSFW content is restricted for non-signed users. Sign up to access all models.</span>
+                    </div>
+
+                    <div class="input-group">
+                        <label>Enter your prompt</label>
+                        <textarea class="prompt-input" id="videoPrompt" placeholder="A serene ocean wave crashing on a tropical beach..."></textarea>
+                    </div>
+
+                    <div class="input-group">
+                        <label>Select Model</label>
+                        <div class="model-selector" id="videoModels">
+                            <div class="model-option selected" data-model="lumina25" onclick="selectModel(this, 'video')">
+                                <div class="model-name">Lumina 2.5 Pro</div>
+                                <div class="model-tag">Best Quality</div>
+                            </div>
+                            <div class="model-option" data-model="runway" onclick="selectModel(this, 'video')">
+                                <div class="model-name">Runway Gen-2</div>
+                                <div class="model-tag">Cinematic</div>
+                            </div>
+                            <div class="model-option" data-model="pika" onclick="selectModel(this, 'video')">
+                                <div class="model-name">Pika Labs</div>
+                                <div class="model-tag">Creative</div>
+                            </div>
+                            <div class="model-option" data-model="stable-video" onclick="selectModel(this, 'video')">
+                                <div class="model-name">Stable Video</div>
+                                <div class="model-tag">Open Source</div>
+                            </div>
+                            <div class="model-option" data-model="haiper" onclick="selectModel(this, 'video')">
+                                <div class="model-name">Haiper</div>
+                                <div class="model-tag">Realistic</div>
+                            </div>
+                            <div class="model-option" data-model="ltx" onclick="selectModel(this, 'video')">
+                                <div class="model-name">LTX Studio</div>
+                                <div class="model-tag">Storytelling</div>
+                            </div>
+                            <div class="model-option locked" data-model="sora" onclick="selectModel(this, 'video')">
+                                <div class="lock-icon"><i class="fas fa-lock"></i></div>
+                                <div class="model-name">Sora</div>
+                                <div class="model-tag">Pro Only</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-primary btn-glow generate-btn" style="background: var(--gradient-2);" onclick="generateVideo()">
+                        <i class="fas fa-film"></i> Generate Video
+                    </button>
+
+                    <div class="output-area" id="videoOutput">
+                        <div class="output-placeholder">
+                            <i class="fas fa-video"></i>
+                            <p>Your generated video will appear here</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- About Section -->
+        <section id="about" class="section">
+            <div class="hero">
+                <h1>About Lumina AI</h1>
+                <p>Pioneering the future of creative AI technology</p>
+            </div>
+
+            <div class="generators-grid">
+                <div class="generator-card">
+                    <div class="card-header">
+                        <div class="card-icon">
+                            <i class="fas fa-rocket"></i>
+                        </div>
+                        <div>
+                            <div class="card-title">Our Mission</div>
+                            <div class="card-subtitle">Democratizing AI creativity</div>
+                        </div>
+                    </div>
+                    <p style="color: var(--text-secondary); line-height: 1.6;">
+                        Lumina AI was founded with a singular vision: to make professional-grade AI generation accessible to everyone. 
+                        We believe that creativity should never be limited by technical barriers or financial constraints.
+                    </p>
+                </div>
+
+                <div class="generator-card">
+                    <div class="card-header">
+                        <div class="card-icon" style="background: var(--gradient-2);">
+                            <i class="fas fa-shield-halved"></i>
+                        </div>
+                        <div>
+                            <div class="card-title">Safety First</div>
+                            <div class="card-subtitle">Responsible AI generation</div>
+                        </div>
+                    </div>
+                    <p style="color: var(--text-secondary); line-height: 1.6;">
+                        We implement state-of-the-art safety filters and content moderation to ensure all generated content 
+                        adheres to community guidelines. Our NSFW detection system maintains a safe environment for all users.
+                    </p>
+                </div>
+
+                <div class="generator-card">
+                    <div class="card-header">
+                        <div class="card-icon" style="background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);">
+                            <i class="fas fa-bolt"></i>
+                        </div>
+                        <div>
+                            <div class="card-title">Lightning Fast</div>
+                            <div class="card-subtitle">Optimized infrastructure</div>
+                        </div>
+                    </div>
+                    <p style="color: var(--text-secondary); line-height: 1.6;">
+                        Powered by distributed GPU clusters and advanced caching mechanisms, Lumina AI delivers 
+                        your creations in seconds, not minutes. Our 99.9% uptime guarantee ensures you're always ready to create.
+                    </p>
+                </div>
+
+                <div class="generator-card">
+                    <div class="card-header">
+                        <div class="card-icon" style="background: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%);">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div>
+                            <div class="card-title">Community Driven</div>
+                            <div class="card-subtitle">Built by creators, for creators</div>
+                        </div>
+                    </div>
+                    <p style="color: var(--text-secondary); line-height: 1.6;">
+                        With over 1 million active users and 10 million creations, our community drives innovation. 
+                        We actively incorporate user feedback to improve our models and user experience.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- History Section -->
+        <section id="history" class="section">
+            <div class="hero">
+                <h1>Your Creation History</h1>
+                <p>All your generated content in one place</p>
+            </div>
+
+            <div class="history-grid" id="historyGrid">
+                <!-- History items will be populated here -->
+            </div>
+
+            <div id="emptyHistory" style="text-align: center; padding: 4rem; color: var(--text-secondary);">
+                <i class="fas fa-clock-rotate-left" style="font-size: 4rem; margin-bottom: 1rem; opacity: 0.3;"></i>
+                <p>No creations yet. Start generating photos and videos!</p>
+            </div>
+        </section>
+
+        <!-- Contact Section -->
+        <section id="contact" class="section">
+            <div class="hero">
+                <h1>Get in Touch</h1>
+                <p>We'd love to hear from you</p>
+            </div>
+
+            <div class="contact-container">
+                <div class="contact-card">
+                    <div class="contact-avatar">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div class="contact-name">Rayan Bro</div>
+                    <div class="contact-role">Founder & Lead Developer</div>
+
+                    <div class="contact-links">
+                        <a href="mailto:rayan.bro.bd@gmail.com" class="contact-link">
+                            <i class="fas fa-envelope"></i>
+                            <div>
+                                <div style="font-weight: 600;">Email</div>
+                                <div style="font-size: 0.85rem; color: var(--text-secondary);">rayan.bro.bd@gmail.com</div>
+                            </div>
+                        </a>
+                        <a href="https://t.me/rayan_bro_bd" target="_blank" class="contact-link">
+                            <i class="fab fa-telegram"></i>
+                            <div>
+                                <div style="font-weight: 600;">Telegram</div>
+                                <div style="font-size: 0.85rem; color: var(--text-secondary);">@rayan_bro_bd</div>
+                            </div>
+                        </a>
+                        <a href="https://github.com/rayan-bro-bd" target="_blank" class="contact-link">
+                            <i class="fab fa-github"></i>
+                            <div>
+                                <div style="font-weight: 600;">GitHub</div>
+                                <div style="font-size: 0.85rem; color: var(--text-secondary);">rayan-bro-bd</div>
+                            </div>
+                        </a>
+                        <a href="https://facebook.com/rayan.bro.bd" target="_blank" class="contact-link">
+                            <i class="fab fa-facebook"></i>
+                            <div>
+                                <div style="font-weight: 600;">Facebook</div>
+                                <div style="font-size: 0.85rem; color: var(--text-secondary);">rayan.bro.bd</div>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Login Modal -->
+    <div class="modal-overlay" id="loginModal">
+        <div class="modal">
+            <button class="modal-close" onclick="closeModal('login')">
+                <i class="fas fa-times"></i>
+            </button>
+            <h2>Welcome Back</h2>
+            <p class="modal-subtitle">Sign in to access all features</p>
+
+            <form onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" class="form-input" id="loginEmail" placeholder="you@example.com" required>
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" class="form-input" id="loginPassword" placeholder="••••••••" required>
+                </div>
+                <button type="submit" class="btn btn-primary btn-glow form-submit">Sign In</button>
+            </form>
+
+            <div class="modal-footer">
+                Don't have an account? <a href="#" onclick="switchModal('login', 'signup')">Sign up</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Signup Modal -->
+    <div class="modal-overlay" id="signupModal">
+        <div class="modal">
+            <button class="modal-close" onclick="closeModal('signup')">
+                <i class="fas fa-times"></i>
+            </button>
+            <h2>Create Account</h2>
+            <p class="modal-subtitle">Join Lumina AI today</p>
+
+            <form onsubmit="handleSignup(event)">
+                <div class="form-group">
+                    <label>Full Name</label>
+                    <input type="text" class="form-input" id="signupName" placeholder="John Doe" required>
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" class="form-input" id="signupEmail" placeholder="you@example.com" required>
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" class="form-input" id="signupPassword" placeholder="••••••••" required>
+                </div>
+                <button type="submit" class="btn btn-primary btn-glow form-submit">Create Account</button>
+            </form>
+
+            <div class="modal-footer">
+                Already have an account? <a href="#" onclick="switchModal('signup', 'login')">Log in</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Limit Badge -->
+    <div class="limit-badge" id="limitBadge" style="display: none;">
+        <div class="limit-title">
+            <i class="fas fa-gauge-high"></i>
+            Free Usage
+        </div>
+        <div class="limit-bar">
+            <div class="limit-progress" id="limitProgress" style="width: 0%"></div>
+        </div>
+        <div class="limit-text" id="limitText">0 / 4 creations used</div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // State Management
+        let currentUser = null;
+        let creationsCount = 0;
+        const MAX_FREE_CREATIONS = 4;
+        let generationHistory = JSON.parse(localStorage.getItem('lumina_history') || '[]');
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            checkAuthState();
+            updateLimitBadge();
+            renderHistory();
+        });
+
+        // Navigation
+        function showSection(sectionId) {
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.getElementById(sectionId).classList.add('active');
+
+            document.querySelectorAll('.nav-links a').forEach(a => a.classList.remove('active'));
+            document.querySelector(`a[href="#${sectionId}"]`).classList.add('active');
+
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function scrollToGenerators() {
+            document.getElementById('generators').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // Modal Functions
+        function openModal(type) {
+            document.getElementById(type + 'Modal').classList.add('active');
+        }
+
+        function closeModal(type) {
+            document.getElementById(type + 'Modal').classList.remove('active');
+        }
+
+        function switchModal(from, to) {
+            closeModal(from);
+            setTimeout(() => openModal(to), 300);
+        }
+
+        // Close modal on outside click
+        document.querySelectorAll('.modal-overlay').forEach(overlay => {
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) {
+                    overlay.classList.remove('active');
+                }
+            });
+        });
+
+        // Auth Functions
+        function handleSignup(e) {
+            e.preventDefault();
+            const name = document.getElementById('signupName').value;
+            const email = document.getElementById('signupEmail').value;
+            const password = document.getElementById('signupPassword').value;
+
+            // Simulate signup
+            const user = {
+                name: name,
+                email: email,
+                id: Date.now().toString(),
+                createdAt: new Date().toISOString()
+            };
+
+            localStorage.setItem('lumina_user', JSON.stringify(user));
+            currentUser = user;
+
+            closeModal('signup');
+            updateUIForUser();
+            showToast('Account created successfully!', 'success');
+        }
+
+        function handleLogin(e) {
+            e.preventDefault();
+            const email = document.getElementById('loginEmail').value;
+
+            // Simulate login (in real app, verify credentials)
+            const user = {
+                name: email.split('@')[0],
+                email: email,
+                id: Date.now().toString()
+            };
+
+            localStorage.setItem('lumina_user', JSON.stringify(user));
+            currentUser = user;
+
+            closeModal('login');
+            updateUIForUser();
+            showToast('Welcome back!', 'success');
+        }
+
+        function logout() {
+            localStorage.removeItem('lumina_user');
+            currentUser = null;
+            creationsCount = 0;
+            updateUIForGuest();
+            showToast('Logged out successfully', 'success');
+        }
+
+        function checkAuthState() {
+            const user = localStorage.getItem('lumina_user');
+            if (user) {
+                currentUser = JSON.parse(user);
+                updateUIForUser();
+            } else {
+                updateUIForGuest();
+            }
+        }
+
+        function updateUIForUser() {
+            document.getElementById('navAuth').style.display = 'none';
+            document.getElementById('userBadge').style.display = 'flex';
+            document.getElementById('userName').textContent = currentUser.name;
+            document.getElementById('userAvatar').textContent = currentUser.name.charAt(0).toUpperCase();
+
+            // Unlock all models
+            document.querySelectorAll('.model-option.locked').forEach(el => {
+                el.classList.remove('locked');
+                el.querySelector('.lock-icon')?.remove();
+            });
+
+            document.getElementById('limitBadge').style.display = 'none';
+            document.getElementById('nsfwWarning').style.display = 'none';
+        }
+
+        function updateUIForGuest() {
+            document.getElementById('navAuth').style.display = 'flex';
+            document.getElementById('userBadge').style.display = 'none';
+            document.getElementById('limitBadge').style.display = 'block';
+            document.getElementById('nsfwWarning').style.display = 'flex';
+
+            // Lock pro models
+            document.querySelectorAll('.model-option[data-model="flux"], .model-option[data-model="ideogram"], .model-option[data-model="sora"]').forEach(el => {
+                if (!el.classList.contains('locked')) {
+                    el.classList.add('locked');
+                    el.innerHTML = '<div class="lock-icon"><i class="fas fa-lock"></i></div>' + el.innerHTML;
+                }
+            });
+        }
+
+        // Model Selection
+        function selectModel(element, type) {
+            if (element.classList.contains('locked')) {
+                showToast('Sign up to access this model', 'error');
+                return;
+            }
+
+            const container = type === 'photo' ? 'photoModels' : 'videoModels';
+            document.querySelectorAll(`#${container} .model-option`).forEach(el => el.classList.remove('selected'));
+            element.classList.add('selected');
+        }
+
+        // Generation Functions
+        function canGenerate() {
+            if (currentUser) return true;
+            if (creationsCount >= MAX_FREE_CREATIONS) {
+                showToast('Free limit reached. Sign up for unlimited access!', 'error');
+                openModal('signup');
+                return false;
+            }
+            return true;
+        }
+
+        function updateLimitBadge() {
+            if (currentUser) return;
+
+            const progress = (creationsCount / MAX_FREE_CREATIONS) * 100;
+            document.getElementById('limitProgress').style.width = progress + '%';
+            document.getElementById('limitText').textContent = `${creationsCount} / ${MAX_FREE_CREATIONS} creations used`;
+        }
+
+        function generatePhoto() {
+            if (!canGenerate()) return;
+
+            const prompt = document.getElementById('photoPrompt').value;
+            if (!prompt.trim()) {
+                showToast('Please enter a prompt', 'error');
+                return;
+            }
+
+            const output = document.getElementById('photoOutput');
+            output.innerHTML = '<div style="display: flex; flex-direction: column; align-items: center; gap: 1rem;"><div class="loading-spinner"></div><p style="color: var(--text-secondary);">Generating your image...</p></div>';
+
+            // Simulate generation
+            setTimeout(() => {
+                const timestamp = Date.now();
+                const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=1024&nologo=true&seed=${timestamp}`;
+
+                output.innerHTML = `
+                    <img src="${imageUrl}" class="output-image" alt="Generated image">
+                    <div class="output-actions">
+                        <button class="action-btn" onclick="downloadMedia('${imageUrl}', 'photo')" title="Download">
+                            <i class="fas fa-download"></i>
+                        </button>
+                        <button class="action-btn" onclick="shareMedia('${imageUrl}')" title="Share">
+                            <i class="fas fa-share-nodes"></i>
+                        </button>
+                    </div>
+                `;
+
+                addToHistory(prompt, imageUrl, 'photo');
+                if (!currentUser) {
+                    creationsCount++;
+                    updateLimitBadge();
+                }
+                showToast('Image generated successfully!', 'success');
+            }, 3000);
+        }
+
+        function generateVideo() {
+            if (!canGenerate()) return;
+
+            const prompt = document.getElementById('videoPrompt').value;
+            if (!prompt.trim()) {
+                showToast('Please enter a prompt', 'error');
+                return;
+            }
+
+            // Check NSFW for non-signed users
+            if (!currentUser && containsNSFW(prompt)) {
+                showToast('NSFW content is restricted for non-signed users', 'error');
+                return;
+            }
+
+            const output = document.getElementById('videoOutput');
+            output.innerHTML = '<div style="display: flex; flex-direction: column; align-items: center; gap: 1rem;"><div class="loading-spinner"></div><p style="color: var(--text-secondary);">Generating your video with Lumina 2.5 Pro...</p></div>';
+
+            // Simulate video generation
+            setTimeout(() => {
+                // Using a sample video URL - in production, this would be your Python backend
+                const videoUrl = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
+
+                output.innerHTML = `
+                    <video class="output-video" controls poster="https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=576&nologo=true">
+                        <source src="${videoUrl}" type="video/mp4">
+                    </video>
+                    <div class="output-actions">
+                        <button class="action-btn" onclick="downloadMedia('${videoUrl}', 'video')" title="Download">
+                            <i class="fas fa-download"></i>
+                        </button>
+                        <button class="action-btn" onclick="shareMedia('${videoUrl}')" title="Share">
+                            <i class="fas fa-share-nodes"></i>
+                        </button>
+                    </div>
+                `;
+
+                addToHistory(prompt, videoUrl, 'video');
+                if (!currentUser) {
+                    creationsCount++;
+                    updateLimitBadge();
+                }
+                showToast('Video generated successfully!', 'success');
+            }, 5000);
+        }
+
+        // NSFW Detection (Basic)
+        function containsNSFW(text) {
+            const nsfwWords = ['nsfw', 'nude', 'naked', 'porn', 'sex', 'adult', 'xxx', 'explicit'];
+            const lowerText = text.toLowerCase();
+            return nsfwWords.some(word => lowerText.includes(word));
+        }
+
+        // History Functions
+        function addToHistory(prompt, url, type) {
+            const item = {
+                id: Date.now(),
+                prompt: prompt,
+                url: url,
+                type: type,
+                timestamp: new Date().toISOString()
+            };
+
+            generationHistory.unshift(item);
+            localStorage.setItem('lumina_history', JSON.stringify(generationHistory));
+            renderHistory();
+        }
+
+        function renderHistory() {
+            const grid = document.getElementById('historyGrid');
+            const empty = document.getElementById('emptyHistory');
+
+            if (generationHistory.length === 0) {
+                grid.style.display = 'none';
+                empty.style.display = 'block';
+                return;
+            }
+
+            grid.style.display = 'grid';
+            empty.style.display = 'none';
+
+            grid.innerHTML = generationHistory.map(item => `
+                <div class="history-item">
+                    ${item.type === 'photo' 
+                        ? `<img src="${item.url}" class="history-thumb" alt="${item.prompt}">`
+                        : `<video src="${item.url}" class="history-thumb" poster="https://image.pollinations.ai/prompt/${encodeURIComponent(item.prompt)}?width=512&height=512&nologo=true"></video>`
+                    }
+                    <div class="history-info">
+                        <div class="history-prompt">${item.prompt}</div>
+                        <div class="history-meta">
+                            <span class="history-type">${item.type.toUpperCase()}</span>
+                            <span>${new Date(item.timestamp).toLocaleDateString()}</span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Utility Functions
+        function downloadMedia(url, type) {
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `lumina-${type}-${Date.now()}.${type === 'photo' ? 'jpg' : 'mp4'}`;
+            a.click();
+            showToast('Download started!', 'success');
+        }
+
+        function shareMedia(url) {
+            if (navigator.share) {
+                navigator.share({ title: 'Lumina AI Creation', url: url });
+            } else {
+                navigator.clipboard.writeText(url);
+                showToast('Link copied to clipboard!', 'success');
+            }
+        }
+
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast toast-${type} show`;
+
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
+            }
+        });
+    </script>
+</body>
+</html>
