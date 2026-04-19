@@ -251,26 +251,32 @@ export default function PhotoGeneration() {
             {result ? (
               <>
                 <img src={result} alt={prompt} className="w-full h-full object-cover" />
-                <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center gap-4 backdrop-blur-sm">
-                  <button
-                    onClick={handleDownload}
-                    className="w-11 h-11 rounded-full bg-white/10 border border-white/20 flex items-center justify-center hover:bg-white/20 transition-colors"
-                  >
-                    <Download className="w-5 h-5" />
-                  </button>
+                {/* Hover overlay — share & fullscreen */}
+                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center gap-4 backdrop-blur-sm">
                   <button
                     onClick={() => { navigator.clipboard.writeText(result); toast({ title: "Link copied!" }); }}
                     className="w-11 h-11 rounded-full bg-white/10 border border-white/20 flex items-center justify-center hover:bg-white/20 transition-colors"
+                    title="Copy link"
                   >
                     <Share2 className="w-5 h-5" />
                   </button>
                   <button
                     onClick={() => setIsFullscreen(true)}
                     className="w-11 h-11 rounded-full bg-white/10 border border-white/20 flex items-center justify-center hover:bg-white/20 transition-colors"
+                    title="Fullscreen"
                   >
                     <Maximize2 className="w-5 h-5" />
                   </button>
                 </div>
+                {/* Download button — bottom-left corner, always visible */}
+                <button
+                  onClick={handleDownload}
+                  className="absolute bottom-3 left-3 flex items-center gap-2 px-3 py-2 rounded-xl bg-black/70 border border-white/20 hover:bg-black/90 backdrop-blur-sm transition-all text-xs font-medium text-white shadow-lg z-10"
+                  title="Download image"
+                >
+                  <Download className="w-4 h-4" />
+                  Download
+                </button>
               </>
             ) : isGenerating ? (
               <div className="w-full h-full flex flex-col items-center justify-center gap-4 bg-background/50">

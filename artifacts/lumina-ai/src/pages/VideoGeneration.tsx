@@ -51,6 +51,7 @@ export default function VideoGeneration() {
   const [loadingStep, setLoadingStep] = useState(0);
   const [progress, setProgress] = useState(0);
   const [textareaFocused, setTextareaFocused] = useState(false);
+  const [resultFilename, setResultFilename] = useState("lumina-video.mp4");
 
   const fillRandomPrompt = useCallback(() => {
     const random = RANDOM_PROMPTS[Math.floor(Math.random() * RANDOM_PROMPTS.length)];
@@ -58,7 +59,6 @@ export default function VideoGeneration() {
     toast({ title: "Random prompt loaded!", description: 'Press "Generate Video" or Ctrl+Enter to create.' });
   }, [toast]);
 
-  // Keyboard shortcut: press R when not typing to fill random prompt
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (textareaFocused) return;
@@ -94,48 +94,52 @@ export default function VideoGeneration() {
     setIsGenerating(true);
     setResult(null);
     setLoadingStep(0);
-    setProgress(0);
+    setProgress(5);
 
     const spent = spendPoints(VIDEO_POINT_COST);
     if (!spent) { setIsGenerating(false); return; }
 
-    // Animate loading steps while waiting
-    const stepMs = 7000;
+    // Animate progress while waiting (steps every 12s since polling is 30 attempts × 3s = 90s max)
+    const stepMs = 12000;
+    let stepIdx = 0;
     const stepInterval = setInterval(() => {
-      setLoadingStep((prev) => Math.min(prev + 1, LOADING_STEPS.length - 1));
-      setProgress((prev) => Math.min(prev + 14, 88));
+      stepIdx = Math.min(stepIdx + 1, LOADING_STEPS.length - 1);
+      setLoadingStep(stepIdx);
+      setProgress((prev) => Math.min(prev + 12, 88));
     }, stepMs);
 
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 90000);
+      const timeoutId = setTimeout(() => controller.abort(), 100000);
 
-      const modelName = VIDEO_MODELS.find(m => m.id === model)?.name ?? "Lumina 2.5";
-      const fullPrompt = `${prompt} [Model: ${modelName}]`;
-
-      const response = await fetch(`/api/generate?prompt=${encodeURIComponent(fullPrompt)}`, {
-        signal: controller.signal,
-      });
+      const response = await fetch(
+        `/api/generate?prompt=${encodeURIComponent(prompt)}&model=${encodeURIComponent(model)}`,
+        { signal: controller.signal }
+      );
       clearTimeout(timeoutId);
 
-      if (!response.ok) throw new Error(`API error: ${response.status}`);
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({ error: "Request failed" })) as { error?: string };
+        throw new Error(err.error ?? `HTTP ${response.status}`);
+      }
 
-      const data = await response.json() as { status?: string; url?: string; error?: string };
+      const data = await response.json() as { status?: string; url?: string; filename?: string; error?: string };
 
       if (data.status === "success" && data.url) {
         setProgress(100);
         setResult(data.url);
-        addHistory({ type: "video", prompt, model: VIDEO_MODELS.find(m => m.id === model)?.name ?? "Unknown", url: data.url });
+        setResultFilename(data.filename ?? `lumina-video-${Date.now()}.mp4`);
+        addHistory({ type: "video", prompt, model: VIDEO_MODELS.find(m2 => m2.id === model)?.name ?? "Unknown", url: data.url });
         toast({ title: "Video generated!", description: "Your cinematic creation is ready." });
       } else {
-        throw new Error(data.error ?? "Unknown error");
+        throw new Error(data.error ?? "Generation returned no video");
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "";
       if (message.includes("abort") || message.includes("Timeout")) {
         toast({ title: "Generation timeout", description: "The request took too long. Try a shorter prompt.", variant: "destructive" });
       } else {
-        toast({ title: "Generation failed", description: "Could not generate video. Please try again.", variant: "destructive" });
+        toast({ title: "Generation failed", description: message || "Could not generate video. Please try again.", variant: "destructive" });
       }
     } finally {
       clearInterval(stepInterval);
@@ -148,7 +152,7 @@ export default function VideoGeneration() {
     if (!result) return;
     const a = document.createElement("a");
     a.href = result;
-    a.download = `lumina-video-${Date.now()}.mp4`;
+    a.download = resultFilename;
     a.target = "_blank";
     a.click();
     toast({ title: "Download started!" });
@@ -217,7 +221,7 @@ export default function VideoGeneration() {
                 if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) handleGenerate();
               }}
             />
-            <p className="text-xs text-muted-foreground/50 mt-2">Ctrl+Enter to generate · R for random prompt · ~30 sec wait</p>
+            <p className="text-xs text-muted-foreground/50 mt-2">Ctrl+Enter to generate · R for random prompt · ~30–60 sec wait</p>
           </div>
 
           <div className="glass-card rounded-2xl p-6">
@@ -262,18 +266,26 @@ export default function VideoGeneration() {
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.4, delay: 0.15 }}
         >
-          <div className="glass-card rounded-2xl overflow-hidden aspect-square relative group">
+          <div className="glass-card rounded-2xl overflow-hidden aspect-square relative">
             {result ? (
               <>
-                <video src={result} controls autoPlay loop playsInline className="w-full h-full object-cover" />
-                <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
-                    onClick={handleDownload}
-                    className="w-9 h-9 rounded-full bg-black/60 border border-white/20 flex items-center justify-center hover:bg-black/80 transition-colors backdrop-blur-sm"
-                  >
-                    <Download className="w-4 h-4" />
-                  </button>
-                </div>
+                <video
+                  src={result}
+                  controls
+                  autoPlay
+                  loop
+                  playsInline
+                  className="w-full h-full object-cover"
+                />
+                {/* Download button — bottom-left corner, always visible */}
+                <button
+                  onClick={handleDownload}
+                  className="absolute bottom-3 left-3 flex items-center gap-2 px-3 py-2 rounded-xl bg-black/70 border border-white/20 hover:bg-black/90 backdrop-blur-sm transition-all text-xs font-medium text-white shadow-lg"
+                  title="Download video"
+                >
+                  <Download className="w-4 h-4" />
+                  Download
+                </button>
               </>
             ) : isGenerating ? (
               <div className="w-full h-full flex flex-col items-center justify-center gap-6 bg-background/50 p-8">
@@ -287,14 +299,17 @@ export default function VideoGeneration() {
                   <p className="text-sm font-medium text-secondary animate-pulse mb-1">
                     {LOADING_STEPS[loadingStep]}
                   </p>
-                  <p className="text-xs text-muted-foreground mb-4">Please wait — this takes ~30–60 seconds</p>
+                  <p className="text-xs text-muted-foreground mb-4">
+                    Using {VIDEO_MODELS.find(m => m.id === model)?.name} · ~30–60 seconds
+                  </p>
                   <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
                     <motion.div
                       className="h-full bg-gradient-to-r from-secondary to-accent rounded-full"
                       animate={{ width: `${progress}%` }}
-                      transition={{ duration: 0.5 }}
+                      transition={{ duration: 0.8 }}
                     />
                   </div>
+                  <p className="text-[10px] text-muted-foreground/50 mt-2">{Math.round(progress)}% complete</p>
                 </div>
               </div>
             ) : (
