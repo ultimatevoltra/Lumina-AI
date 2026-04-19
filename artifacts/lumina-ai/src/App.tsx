@@ -9,6 +9,9 @@ import { Background } from "@/components/layout/Background";
 import { Navbar } from "@/components/layout/Navbar";
 import { AuthModals } from "@/components/auth/AuthModals";
 
+import PhotoGeneration from "@/pages/PhotoGeneration";
+import VideoGeneration from "@/pages/VideoGeneration";
+import Gallery from "@/pages/Gallery";
 import Home from "@/pages/Home";
 import About from "@/pages/About";
 import History from "@/pages/History";
@@ -20,6 +23,9 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      <Route path="/photo" component={PhotoGeneration} />
+      <Route path="/video" component={VideoGeneration} />
+      <Route path="/gallery" component={Gallery} />
       <Route path="/about" component={About} />
       <Route path="/history" component={History} />
       <Route path="/contact" component={Contact} />
@@ -31,7 +37,6 @@ function Router() {
 function App() {
   const [authModal, setAuthModal] = useState<"login" | "signup" | null>(null);
 
-  // Force dark mode on body
   useEffect(() => {
     document.documentElement.classList.add("dark");
   }, []);
@@ -42,17 +47,17 @@ function App() {
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
           <div className="min-h-[100dvh] flex flex-col selection:bg-primary/30 text-foreground">
             <Background />
-            <Navbar 
-              onOpenLogin={() => setAuthModal("login")} 
-              onOpenSignup={() => setAuthModal("signup")} 
+            <Navbar
+              onOpenLogin={() => setAuthModal("login")}
+              onOpenSignup={() => setAuthModal("signup")}
             />
             <main className="flex-1 w-full">
               <Router />
             </main>
-            <AuthModals 
-              isOpen={authModal} 
-              onClose={() => setAuthModal(null)} 
-              onSwitch={(to) => setAuthModal(to)} 
+            <AuthModals
+              isOpen={authModal}
+              onClose={() => setAuthModal(null)}
+              onSwitch={(to) => setAuthModal(to)}
             />
           </div>
         </WouterRouter>
