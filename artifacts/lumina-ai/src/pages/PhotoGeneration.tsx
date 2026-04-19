@@ -1,18 +1,43 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Sparkles, Image as ImageIcon, Lock, Download, Share2, Maximize2, Loader2, Zap } from "lucide-react";
+import { Sparkles, Image as ImageIcon, Lock, Download, Share2, Maximize2, Loader2, Zap, Shuffle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useAppState, PHOTO_POINT_COST, FREE_POINTS_PER_MONTH } from "@/hooks/use-local-state";
 import { useToast } from "@/hooks/use-toast";
 
+// Pollinations.ai model name for each model ID
+const POLLINATIONS_MODEL: Record<string, string> = {
+  "pollinations": "flux",
+  "stable-xl": "turbo",
+  "dalle-3": "flux-realism",
+  "midjourney-v6": "flux-anime",
+  "flux-pro": "flux-pro",
+  "ideogram": "any-dark",
+};
+
 const PHOTO_MODELS = [
-  { id: "pollinations", name: "Pollinations", tag: "Free · Fast", pro: false },
+  { id: "pollinations", name: "Pollinations", tag: "Fast", pro: false },
   { id: "stable-xl", name: "Stable XL", tag: "High Quality", pro: false },
-  { id: "dalle-3", name: "DALL·E 3", tag: "Creative", pro: false },
+  { id: "dalle-3", name: "DALL·E 3", tag: "Realistic", pro: false },
   { id: "midjourney-v6", name: "Midjourney V6", tag: "Artistic", pro: true },
-  { id: "flux-pro", name: "Flux Pro", tag: "Pro Only", pro: true },
-  { id: "ideogram", name: "Ideogram", tag: "Pro Only", pro: true },
+  { id: "flux-pro", name: "Flux Pro", tag: "Pro", pro: true },
+  { id: "ideogram", name: "Ideogram", tag: "Dark Art", pro: true },
+];
+
+const RANDOM_PROMPTS = [
+  "A cyberpunk city at night with neon reflections on wet streets, 8k cinematic",
+  "A magical forest with glowing fireflies and ancient trees, ethereal light, fantasy",
+  "An astronaut floating in a colorful nebula, ultra detailed, space art",
+  "A futuristic Tokyo street market at sunset, holographic signs, vibrant colors",
+  "A majestic dragon made of starlight and aurora borealis, epic fantasy art",
+  "An underwater palace with bioluminescent sea creatures, surreal dreamscape",
+  "A steampunk airship above cloud city, golden hour, intricate mechanical details",
+  "A lone samurai standing in a cherry blossom storm, Japanese ink art style",
+  "A portal opening to another dimension in a dark library, mystical energy",
+  "A serene Japanese tea house surrounded by snow and lanterns, winter night",
+  "A massive ancient temple buried in a jungle, golden light through leaves",
+  "Portrait of a futuristic empress with holographic crown, sci-fi fashion",
 ];
 
 export default function PhotoGeneration() {
@@ -24,6 +49,26 @@ export default function PhotoGeneration() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [textareaFocused, setTextareaFocused] = useState(false);
+
+  const fillRandomPrompt = useCallback(() => {
+    const random = RANDOM_PROMPTS[Math.floor(Math.random() * RANDOM_PROMPTS.length)];
+    setPrompt(random);
+    toast({ title: "Random prompt loaded!", description: 'Press "Generate Photo" or Ctrl+Enter to create.' });
+  }, [toast]);
+
+  // Keyboard shortcut: press R when not typing to fill random prompt
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (textareaFocused) return;
+      if (e.key === "r" || e.key === "R") {
+        e.preventDefault();
+        fillRandomPrompt();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [textareaFocused, fillRandomPrompt]);
 
   const handleModelClick = (m: (typeof PHOTO_MODELS)[0]) => {
     if (m.pro && !user) {
@@ -39,7 +84,7 @@ export default function PhotoGeneration() {
     if (!canGenerate(PHOTO_POINT_COST)) {
       toast({
         title: "Not enough points",
-        description: `You need ${PHOTO_POINT_COST.toLocaleString()} points to generate a photo. Sign in for unlimited access.`,
+        description: `You need ${PHOTO_POINT_COST.toLocaleString()} points. Sign in for unlimited access.`,
         variant: "destructive",
       });
       return;
@@ -49,31 +94,36 @@ export default function PhotoGeneration() {
     setResult(null);
 
     const spent = spendPoints(PHOTO_POINT_COST);
-    if (!spent) {
-      setIsGenerating(false);
-      return;
-    }
+    if (!spent) { setIsGenerating(false); return; }
 
     try {
       const seed = Math.floor(Math.random() * 999999);
-      const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=768&height=768&seed=${seed}&nologo=true&enhance=true`;
+      const pollinationsModel = POLLINATIONS_MODEL[model] ?? "flux";
+      const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?model=${pollinationsModel}&width=768&height=768&seed=${seed}&nologo=true`;
 
-      // Pre-load the image
+      // Wait for image to be fully loaded
       await new Promise<void>((resolve, reject) => {
         const img = new Image();
         img.onload = () => resolve();
         img.onerror = () => reject(new Error("Image load failed"));
         img.src = imageUrl;
-        setTimeout(() => reject(new Error("Timeout")), 30000);
+        setTimeout(() => reject(new Error("Timeout")), 40000);
       });
 
       setResult(imageUrl);
-      addHistory({ type: "photo", prompt, model: PHOTO_MODELS.find(m => m.id === model)?.name ?? "Unknown", url: imageUrl });
-      toast({ title: "Photo generated!", description: "Your creation has been saved to Gallery." });
+      addHistory({ type: "photo", prompt, model: PHOTO_MODELS.find(m2 => m2.id === model)?.name ?? "Unknown", url: imageUrl });
+      toast({ title: "Photo generated!", description: "Saved to your Gallery." });
     } catch {
-      const fallback = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=768&height=768&seed=${Math.floor(Math.random() * 999999)}&nologo=true`;
-      setResult(fallback);
-      addHistory({ type: "photo", prompt, model: PHOTO_MODELS.find(m => m.id === model)?.name ?? "Unknown", url: fallback });
+      // Retry with a different seed on failure
+      try {
+        const seed2 = Math.floor(Math.random() * 999999);
+        const pollinationsModel = POLLINATIONS_MODEL[model] ?? "flux";
+        const fallback = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?model=${pollinationsModel}&width=768&height=768&seed=${seed2}&nologo=true`;
+        setResult(fallback);
+        addHistory({ type: "photo", prompt, model: PHOTO_MODELS.find(m2 => m2.id === model)?.name ?? "Unknown", url: fallback });
+      } catch {
+        toast({ title: "Generation failed", description: "Please try again.", variant: "destructive" });
+      }
     } finally {
       setIsGenerating(false);
     }
@@ -111,9 +161,9 @@ export default function PhotoGeneration() {
           <div className="flex items-center gap-2 text-xs text-muted-foreground mt-3">
             <Zap className="w-3.5 h-3.5 text-primary" />
             <span>
-              {pointsBalance === Infinity
-                ? "Unlimited"
-                : `${pointsBalance.toLocaleString()} / ${FREE_POINTS_PER_MONTH.toLocaleString()}`}{" "}
+              {typeof pointsBalance === "number" && isFinite(pointsBalance)
+                ? `${pointsBalance.toLocaleString()} / ${FREE_POINTS_PER_MONTH.toLocaleString()}`
+                : "Unlimited"}{" "}
               points remaining — each photo costs {PHOTO_POINT_COST.toLocaleString()} pts
             </span>
           </div>
@@ -129,17 +179,30 @@ export default function PhotoGeneration() {
           className="space-y-6"
         >
           <div className="glass-card rounded-2xl p-6">
-            <label className="text-sm font-medium text-muted-foreground block mb-3">Your prompt</label>
+            <div className="flex items-center justify-between mb-3">
+              <label className="text-sm font-medium text-muted-foreground">Your prompt</label>
+              <button
+                onClick={fillRandomPrompt}
+                title="Random prompt (press R)"
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors px-2 py-1 rounded-lg hover:bg-primary/10"
+              >
+                <Shuffle className="w-3.5 h-3.5" />
+                Random
+                <kbd className="ml-0.5 text-[10px] px-1 py-0.5 rounded bg-white/10 border border-white/10 font-mono">R</kbd>
+              </button>
+            </div>
             <Textarea
-              placeholder="A futuristic cityscape at sunset with flying cars and neon lights reflecting on rain-soaked streets..."
+              placeholder="A futuristic cityscape at sunset with flying cars and neon lights..."
               className="min-h-[140px] bg-background/50 border-white/10 focus:border-primary resize-none text-base leading-relaxed"
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
+              onFocus={() => setTextareaFocused(true)}
+              onBlur={() => setTextareaFocused(false)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) handleGenerate();
               }}
             />
-            <p className="text-xs text-muted-foreground/50 mt-2">Press Ctrl+Enter to generate</p>
+            <p className="text-xs text-muted-foreground/50 mt-2">Ctrl+Enter to generate · R for random prompt</p>
           </div>
 
           <div className="glass-card rounded-2xl p-6">
@@ -153,7 +216,7 @@ export default function PhotoGeneration() {
                     model === m.id
                       ? "bg-primary/20 border-primary shadow-[0_0_12px_rgba(99,102,241,0.3)]"
                       : "bg-background/30 border-white/5 hover:bg-white/5 hover:border-white/10"
-                  } ${m.pro && !user ? "opacity-50" : ""}`}
+                  } ${m.pro && !user ? "opacity-60" : ""}`}
                 >
                   <div className="text-xs font-semibold leading-tight mb-0.5">{m.name}</div>
                   <div className="text-[10px] text-muted-foreground">{m.tag}</div>
@@ -168,7 +231,7 @@ export default function PhotoGeneration() {
           <Button
             onClick={handleGenerate}
             disabled={isGenerating || !prompt.trim()}
-            className="w-full h-13 text-base font-semibold bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-[0_0_25px_rgba(99,102,241,0.4)] hover:shadow-[0_0_35px_rgba(99,102,241,0.6)] transition-all"
+            className="w-full h-12 text-base font-semibold bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-[0_0_25px_rgba(99,102,241,0.4)] hover:shadow-[0_0_35px_rgba(99,102,241,0.6)] transition-all"
           >
             {isGenerating ? (
               <><Loader2 className="w-5 h-5 mr-2 animate-spin" />Crafting your image...</>
@@ -187,30 +250,23 @@ export default function PhotoGeneration() {
           <div className="glass-card rounded-2xl overflow-hidden aspect-square relative group">
             {result ? (
               <>
-                <img
-                  src={result}
-                  alt={prompt}
-                  className="w-full h-full object-cover"
-                />
+                <img src={result} alt={prompt} className="w-full h-full object-cover" />
                 <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center gap-4 backdrop-blur-sm">
                   <button
                     onClick={handleDownload}
                     className="w-11 h-11 rounded-full bg-white/10 border border-white/20 flex items-center justify-center hover:bg-white/20 transition-colors"
-                    title="Download"
                   >
                     <Download className="w-5 h-5" />
                   </button>
                   <button
                     onClick={() => { navigator.clipboard.writeText(result); toast({ title: "Link copied!" }); }}
                     className="w-11 h-11 rounded-full bg-white/10 border border-white/20 flex items-center justify-center hover:bg-white/20 transition-colors"
-                    title="Copy link"
                   >
                     <Share2 className="w-5 h-5" />
                   </button>
                   <button
                     onClick={() => setIsFullscreen(true)}
                     className="w-11 h-11 rounded-full bg-white/10 border border-white/20 flex items-center justify-center hover:bg-white/20 transition-colors"
-                    title="Fullscreen"
                   >
                     <Maximize2 className="w-5 h-5" />
                   </button>
@@ -233,6 +289,7 @@ export default function PhotoGeneration() {
               <div className="w-full h-full flex flex-col items-center justify-center gap-3 bg-background/20 text-muted-foreground/30">
                 <ImageIcon className="w-16 h-16 opacity-20" />
                 <p className="text-sm">Your image will appear here</p>
+                <p className="text-xs opacity-60">Press R for a random prompt to get started</p>
               </div>
             )}
           </div>
@@ -256,7 +313,7 @@ export default function PhotoGeneration() {
           onClick={() => setIsFullscreen(false)}
         >
           <img src={result} alt={prompt} className="max-w-full max-h-full object-contain rounded-xl" />
-          <button className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20">
+          <button className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20" onClick={() => setIsFullscreen(false)}>
             <Maximize2 className="w-5 h-5" />
           </button>
         </div>

@@ -1,13 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Video, Lock, Download, Loader2, Zap, Film } from "lucide-react";
+import { Video, Lock, Download, Loader2, Zap, Film, Shuffle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useAppState, VIDEO_POINT_COST, FREE_POINTS_PER_MONTH } from "@/hooks/use-local-state";
 import { useToast } from "@/hooks/use-toast";
 
 const VIDEO_MODELS = [
-  { id: "lumina-2.5", name: "Lumina 2.5 Pro", tag: "Best Quality", pro: false },
+  { id: "lumina-2.5", name: "Lumina 2.5", tag: "Best Quality", pro: false },
   { id: "runway-gen2", name: "Runway Gen-2", tag: "Cinematic", pro: false },
   { id: "pika-labs", name: "Pika Labs", tag: "Creative", pro: false },
   { id: "stable-video", name: "Stable Video", tag: "Open Source", pro: false },
@@ -16,13 +16,28 @@ const VIDEO_MODELS = [
   { id: "sora", name: "Sora", tag: "Pro Only", pro: true },
 ];
 
-const LOADING_MESSAGES = [
+const LOADING_STEPS = [
   "Initializing video model...",
   "Analyzing your prompt...",
   "Generating key frames...",
   "Rendering motion sequences...",
   "Applying cinematic effects...",
   "Finalizing your video...",
+];
+
+const RANDOM_PROMPTS = [
+  "A serene ocean wave crashing on a tropical beach at golden hour, slow motion",
+  "A time-lapse of a flower blooming in a sunlit meadow, macro photography",
+  "A cyberpunk city at night with flying cars and neon rain, cinematic",
+  "Lava flowing into the ocean at dusk, creating clouds of steam, epic",
+  "An astronaut walking on the surface of Mars, 4K cinematic drone shot",
+  "Cherry blossoms falling in a Japanese garden at sunrise, peaceful",
+  "A lightning storm over a mountain range, dramatic time-lapse",
+  "Underwater coral reef with colorful fish swimming, documentary style",
+  "A spaceship launching from Earth, leaving a trail of fire, epic",
+  "Northern lights dancing over a snowy forest, long exposure style",
+  "A wolf howling at the moon in a dark forest, cinematic 4K",
+  "City skyline transitioning from day to night, hyperlapse photography",
 ];
 
 export default function VideoGeneration() {
@@ -35,6 +50,26 @@ export default function VideoGeneration() {
   const [result, setResult] = useState<string | null>(null);
   const [loadingStep, setLoadingStep] = useState(0);
   const [progress, setProgress] = useState(0);
+  const [textareaFocused, setTextareaFocused] = useState(false);
+
+  const fillRandomPrompt = useCallback(() => {
+    const random = RANDOM_PROMPTS[Math.floor(Math.random() * RANDOM_PROMPTS.length)];
+    setPrompt(random);
+    toast({ title: "Random prompt loaded!", description: 'Press "Generate Video" or Ctrl+Enter to create.' });
+  }, [toast]);
+
+  // Keyboard shortcut: press R when not typing to fill random prompt
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (textareaFocused) return;
+      if (e.key === "r" || e.key === "R") {
+        e.preventDefault();
+        fillRandomPrompt();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [textareaFocused, fillRandomPrompt]);
 
   const handleModelClick = (m: (typeof VIDEO_MODELS)[0]) => {
     if (m.pro && !user) {
@@ -62,29 +97,23 @@ export default function VideoGeneration() {
     setProgress(0);
 
     const spent = spendPoints(VIDEO_POINT_COST);
-    if (!spent) {
-      setIsGenerating(false);
-      return;
-    }
+    if (!spent) { setIsGenerating(false); return; }
 
-    // Animate loading steps
+    // Animate loading steps while waiting
+    const stepMs = 7000;
     const stepInterval = setInterval(() => {
-      setLoadingStep((prev) => {
-        const next = prev + 1;
-        if (next >= LOADING_MESSAGES.length) {
-          clearInterval(stepInterval);
-          return prev;
-        }
-        return next;
-      });
-      setProgress((prev) => Math.min(prev + 15, 90));
-    }, 5000);
+      setLoadingStep((prev) => Math.min(prev + 1, LOADING_STEPS.length - 1));
+      setProgress((prev) => Math.min(prev + 14, 88));
+    }, stepMs);
 
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 55000);
+      const timeoutId = setTimeout(() => controller.abort(), 90000);
 
-      const response = await fetch(`/api/generate?prompt=${encodeURIComponent(prompt)}`, {
+      const modelName = VIDEO_MODELS.find(m => m.id === model)?.name ?? "Lumina 2.5";
+      const fullPrompt = `${prompt} [Model: ${modelName}]`;
+
+      const response = await fetch(`/api/generate?prompt=${encodeURIComponent(fullPrompt)}`, {
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
@@ -102,20 +131,11 @@ export default function VideoGeneration() {
         throw new Error(data.error ?? "Unknown error");
       }
     } catch (err: unknown) {
-      clearInterval(stepInterval);
-      const message = err instanceof Error ? err.message : "Unknown error";
-      if (message.includes("aborted") || message.includes("Timeout")) {
-        toast({
-          title: "Generation timeout",
-          description: "Video generation took too long. Try a shorter, simpler prompt.",
-          variant: "destructive",
-        });
+      const message = err instanceof Error ? err.message : "";
+      if (message.includes("abort") || message.includes("Timeout")) {
+        toast({ title: "Generation timeout", description: "The request took too long. Try a shorter prompt.", variant: "destructive" });
       } else {
-        toast({
-          title: "Generation failed",
-          description: "Could not generate video. Please try again.",
-          variant: "destructive",
-        });
+        toast({ title: "Generation failed", description: "Could not generate video. Please try again.", variant: "destructive" });
       }
     } finally {
       clearInterval(stepInterval);
@@ -156,9 +176,9 @@ export default function VideoGeneration() {
           <div className="flex items-center gap-2 text-xs text-muted-foreground mt-3">
             <Zap className="w-3.5 h-3.5 text-secondary" />
             <span>
-              {pointsBalance === Infinity
-                ? "Unlimited"
-                : `${typeof pointsBalance === "number" ? pointsBalance.toLocaleString() : "∞"} / ${FREE_POINTS_PER_MONTH.toLocaleString()}`}{" "}
+              {typeof pointsBalance === "number" && isFinite(pointsBalance)
+                ? `${pointsBalance.toLocaleString()} / ${FREE_POINTS_PER_MONTH.toLocaleString()}`
+                : "Unlimited"}{" "}
               points remaining — each video costs {VIDEO_POINT_COST.toLocaleString()} pts
             </span>
           </div>
@@ -174,17 +194,30 @@ export default function VideoGeneration() {
           className="space-y-6"
         >
           <div className="glass-card rounded-2xl p-6">
-            <label className="text-sm font-medium text-muted-foreground block mb-3">Your prompt</label>
+            <div className="flex items-center justify-between mb-3">
+              <label className="text-sm font-medium text-muted-foreground">Your prompt</label>
+              <button
+                onClick={fillRandomPrompt}
+                title="Random prompt (press R)"
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-secondary transition-colors px-2 py-1 rounded-lg hover:bg-secondary/10"
+              >
+                <Shuffle className="w-3.5 h-3.5" />
+                Random
+                <kbd className="ml-0.5 text-[10px] px-1 py-0.5 rounded bg-white/10 border border-white/10 font-mono">R</kbd>
+              </button>
+            </div>
             <Textarea
               placeholder="A serene ocean wave crashing on a tropical beach at golden hour, slow motion cinematic..."
               className="min-h-[140px] bg-background/50 border-white/10 focus:border-secondary resize-none text-base leading-relaxed"
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
+              onFocus={() => setTextareaFocused(true)}
+              onBlur={() => setTextareaFocused(false)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) handleGenerate();
               }}
             />
-            <p className="text-xs text-muted-foreground/50 mt-2">Press Ctrl+Enter to generate · Videos take ~30 seconds</p>
+            <p className="text-xs text-muted-foreground/50 mt-2">Ctrl+Enter to generate · R for random prompt · ~30 sec wait</p>
           </div>
 
           <div className="glass-card rounded-2xl p-6">
@@ -198,7 +231,7 @@ export default function VideoGeneration() {
                     model === m.id
                       ? "bg-secondary/20 border-secondary shadow-[0_0_12px_rgba(236,72,153,0.3)]"
                       : "bg-background/30 border-white/5 hover:bg-white/5 hover:border-white/10"
-                  } ${m.pro && !user ? "opacity-50" : ""}`}
+                  } ${m.pro && !user ? "opacity-60" : ""}`}
                 >
                   <div className="text-xs font-semibold leading-tight mb-0.5">{m.name}</div>
                   <div className="text-[10px] text-muted-foreground">{m.tag}</div>
@@ -213,7 +246,7 @@ export default function VideoGeneration() {
           <Button
             onClick={handleGenerate}
             disabled={isGenerating || !prompt.trim()}
-            className="w-full h-13 text-base font-semibold bg-gradient-to-r from-secondary to-secondary/80 hover:from-secondary/90 hover:to-secondary/70 shadow-[0_0_25px_rgba(236,72,153,0.4)] hover:shadow-[0_0_35px_rgba(236,72,153,0.6)] transition-all"
+            className="w-full h-12 text-base font-semibold bg-gradient-to-r from-secondary to-secondary/80 hover:from-secondary/90 hover:to-secondary/70 shadow-[0_0_25px_rgba(236,72,153,0.4)] hover:shadow-[0_0_35px_rgba(236,72,153,0.6)] transition-all"
           >
             {isGenerating ? (
               <><Loader2 className="w-5 h-5 mr-2 animate-spin" />Rendering...</>
@@ -232,19 +265,11 @@ export default function VideoGeneration() {
           <div className="glass-card rounded-2xl overflow-hidden aspect-square relative group">
             {result ? (
               <>
-                <video
-                  src={result}
-                  controls
-                  autoPlay
-                  loop
-                  playsInline
-                  className="w-full h-full object-cover"
-                />
+                <video src={result} controls autoPlay loop playsInline className="w-full h-full object-cover" />
                 <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
                     onClick={handleDownload}
                     className="w-9 h-9 rounded-full bg-black/60 border border-white/20 flex items-center justify-center hover:bg-black/80 transition-colors backdrop-blur-sm"
-                    title="Download"
                   >
                     <Download className="w-4 h-4" />
                   </button>
@@ -260,9 +285,9 @@ export default function VideoGeneration() {
                 </div>
                 <div className="text-center w-full">
                   <p className="text-sm font-medium text-secondary animate-pulse mb-1">
-                    {LOADING_MESSAGES[loadingStep]}
+                    {LOADING_STEPS[loadingStep]}
                   </p>
-                  <p className="text-xs text-muted-foreground mb-4">Please wait — this takes ~30 seconds</p>
+                  <p className="text-xs text-muted-foreground mb-4">Please wait — this takes ~30–60 seconds</p>
                   <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
                     <motion.div
                       className="h-full bg-gradient-to-r from-secondary to-accent rounded-full"
@@ -276,6 +301,7 @@ export default function VideoGeneration() {
               <div className="w-full h-full flex flex-col items-center justify-center gap-3 bg-background/20 text-muted-foreground/30">
                 <Film className="w-16 h-16 opacity-20" />
                 <p className="text-sm">Your video will appear here</p>
+                <p className="text-xs opacity-60">Press R for a random prompt to get started</p>
               </div>
             )}
           </div>
