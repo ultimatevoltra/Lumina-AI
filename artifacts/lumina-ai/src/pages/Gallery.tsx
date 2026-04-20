@@ -20,13 +20,32 @@ export default function Gallery() {
     toast({ title: "Removed from Gallery" });
   };
 
-  const handleDownload = (url: string, type: "photo" | "video") => {
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `lumina-${type}-${Date.now()}.${type === "video" ? "mp4" : "jpg"}`;
-    a.target = "_blank";
-    a.click();
-    toast({ title: "Download started!" });
+  const handleDownload = async (url: string, type: "photo" | "video") => {
+    const ext = type === "video" ? "mp4" : "jpg";
+    const filename = `lumina-${type}-${Date.now()}.${ext}`;
+    try {
+      const proxyUrl = `${import.meta.env.BASE_URL}api/download?url=${encodeURIComponent(url)}&filename=${filename}`;
+      const resp = await fetch(proxyUrl);
+      if (!resp.ok) throw new Error("proxy failed");
+      const blob = await resp.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+      toast({ title: "Downloaded!" });
+    } catch {
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      toast({ title: "Download started!" });
+    }
   };
 
   const openLightbox = (url: string, type: "photo" | "video") => {

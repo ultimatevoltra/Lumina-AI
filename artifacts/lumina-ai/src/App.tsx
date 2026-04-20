@@ -7,6 +7,7 @@ import NotFound from "@/pages/not-found";
 
 import { Background } from "@/components/layout/Background";
 import { Navbar } from "@/components/layout/Navbar";
+import { Footer } from "@/components/layout/Footer";
 import { AuthModals } from "@/components/auth/AuthModals";
 
 import PhotoGeneration from "@/pages/PhotoGeneration";
@@ -16,6 +17,9 @@ import Home from "@/pages/Home";
 import About from "@/pages/About";
 import History from "@/pages/History";
 import Contact from "@/pages/Contact";
+import Pricing from "@/pages/Pricing";
+import Blog from "@/pages/Blog";
+import Careers from "@/pages/Careers";
 
 const queryClient = new QueryClient();
 
@@ -29,6 +33,9 @@ function Router() {
       <Route path="/about" component={About} />
       <Route path="/history" component={History} />
       <Route path="/contact" component={Contact} />
+      <Route path="/pricing" component={Pricing} />
+      <Route path="/blog" component={Blog} />
+      <Route path="/careers" component={Careers} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -54,6 +61,7 @@ function App() {
             <main className="flex-1 w-full">
               <Router />
             </main>
+            <Footer />
             <AuthModals
               isOpen={authModal}
               onClose={() => setAuthModal(null)}

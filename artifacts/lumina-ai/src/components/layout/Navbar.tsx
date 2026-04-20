@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Sparkles, LogOut, Menu, X, Zap, History, Info, Mail, Home } from "lucide-react";
+import { Sparkles, LogOut, Menu, X, Zap, History, Info, Mail, BookOpen, Briefcase, DollarSign, ChevronDown, User, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAppState, FREE_POINTS_PER_MONTH, PHOTO_POINT_COST } from "@/hooks/use-local-state";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -19,22 +19,42 @@ const MAIN_LINKS = [
 ];
 
 const DRAWER_LINKS = [
-  { href: "/", label: "Home", icon: Home },
-  { href: "/history", label: "History", icon: History },
+  { href: "/blog", label: "Blog", icon: BookOpen },
+  { href: "/careers", label: "Careers", icon: Briefcase },
+  { href: "/pricing", label: "Pricing", icon: DollarSign },
   { href: "/about", label: "About", icon: Info },
   { href: "/contact", label: "Contact", icon: Mail },
 ];
 
+function getCurrentMonthLabel() {
+  return new Date().toLocaleString("en-US", { month: "long", year: "numeric" });
+}
+
 export function Navbar({ onOpenLogin, onOpenSignup }: NavbarProps) {
   const [location] = useLocation();
-  const { user, setUser, pointsBalance, pointsPercent } = useAppState();
+  const { user, setUser, pointsBalance, pointsPercent, pointsUsed, isUnlimited, couponUnlocked } = useAppState();
   const { toast } = useToast();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const accountRef = useRef<HTMLDivElement>(null);
 
   const handleLogout = () => {
     setUser(null);
     toast({ title: "Logged out", description: "See you next time!" });
   };
+
+  // Close account popup on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (accountRef.current && !accountRef.current.contains(e.target as Node)) {
+        setAccountOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const planLabel = user?.plan ? user.plan.charAt(0).toUpperCase() + user.plan.slice(1) : (isUnlimited ? "Coupon" : "Free");
 
   return (
     <>
@@ -73,7 +93,7 @@ export function Navbar({ onOpenLogin, onOpenSignup }: NavbarProps) {
           {/* Right side */}
           <div className="flex items-center gap-2 shrink-0">
             {/* Points badge for free users */}
-            {!user && (
+            {!isUnlimited && (
               <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs">
                 <Zap className="w-3.5 h-3.5 text-primary" />
                 <div className="flex items-center gap-1.5">
@@ -94,28 +114,98 @@ export function Navbar({ onOpenLogin, onOpenSignup }: NavbarProps) {
             )}
 
             {user ? (
-              <div className="flex items-center gap-2">
-                <Avatar className="h-8 w-8 border border-primary/30 shadow-[0_0_10px_rgba(99,102,241,0.2)]">
-                  {user.avatar && <img src={user.avatar} alt={user.name} className="w-full h-full object-cover rounded-full" />}
-                  <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                    {user.name.charAt(0).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="hidden sm:block">
-                  <div className="text-sm font-medium leading-none">{user.name}</div>
-                  <div className="text-xs text-emerald-400 flex items-center gap-1 mt-0.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    Unlimited
-                  </div>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleLogout}
-                  className="text-muted-foreground hover:text-foreground hover:bg-white/5 h-8 w-8"
+              <div className="flex items-center gap-2 relative" ref={accountRef}>
+                {/* Clickable account button */}
+                <button
+                  onClick={() => setAccountOpen((v) => !v)}
+                  className="flex items-center gap-2 px-2 py-1 rounded-xl hover:bg-white/5 transition-colors"
                 >
-                  <LogOut className="h-4 w-4" />
-                </Button>
+                  <Avatar className="h-8 w-8 border border-primary/30 shadow-[0_0_10px_rgba(99,102,241,0.2)]">
+                    {user.avatar && <img src={user.avatar} alt={user.name} className="w-full h-full object-cover rounded-full" />}
+                    <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                      {user.name.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="hidden sm:block text-left">
+                    <div className="text-xs font-medium leading-none">{user.name.split(" ")[0]}</div>
+                    <div className="text-[10px] text-muted-foreground mt-0.5">{planLabel}</div>
+                  </div>
+                  <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground hidden sm:block transition-transform ${accountOpen ? "rotate-180" : ""}`} />
+                </button>
+
+                {/* Account details popup */}
+                <AnimatePresence>
+                  {accountOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -8, scale: 0.96 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -8, scale: 0.96 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute top-full right-0 mt-2 w-64 glass-card rounded-2xl border border-border/60 shadow-2xl z-50 overflow-hidden"
+                    >
+                      {/* Header */}
+                      <div className="p-4 border-b border-border/40">
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-11 w-11 border border-primary/30">
+                            {user.avatar && <img src={user.avatar} alt={user.name} className="w-full h-full object-cover rounded-full" />}
+                            <AvatarFallback className="bg-primary/10 text-primary text-base font-bold">
+                              {user.name.charAt(0).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <div className="font-semibold text-sm">{user.name}</div>
+                            <div className="text-xs text-muted-foreground truncate max-w-[140px]">{user.email}</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Details */}
+                      <div className="p-4 space-y-3">
+                        <div className="flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <User className="w-3.5 h-3.5" />
+                            Plan
+                          </div>
+                          <span className="font-semibold text-primary capitalize">{planLabel}</span>
+                        </div>
+
+                        <div className="flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <Calendar className="w-3.5 h-3.5" />
+                            Billing cycle
+                          </div>
+                          <span className="font-medium">{getCurrentMonthLabel()}</span>
+                        </div>
+
+                        <div className="flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <Zap className="w-3.5 h-3.5" />
+                            Points limit
+                          </div>
+                          <span className="font-medium text-emerald-400">Unlimited</span>
+                        </div>
+
+                        {user.provider && (
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-muted-foreground">Provider</span>
+                            <span className="capitalize font-medium">{user.provider}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Logout */}
+                      <div className="px-4 pb-4">
+                        <button
+                          onClick={() => { handleLogout(); setAccountOpen(false); }}
+                          className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-white/5 border border-white/10 transition-colors"
+                        >
+                          <LogOut className="w-3.5 h-3.5" />
+                          Sign out
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             ) : (
               <div className="flex items-center gap-2">
@@ -137,7 +227,7 @@ export function Navbar({ onOpenLogin, onOpenSignup }: NavbarProps) {
               </div>
             )}
 
-            {/* Hamburger — always visible, top-right */}
+            {/* Hamburger */}
             <button
               onClick={() => setDrawerOpen(true)}
               className="w-9 h-9 flex items-center justify-center rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 transition-colors ml-1"
@@ -166,7 +256,7 @@ export function Navbar({ onOpenLogin, onOpenSignup }: NavbarProps) {
         </div>
 
         {/* Low-points warning */}
-        {!user && typeof pointsBalance === "number" && isFinite(pointsBalance) && pointsBalance < PHOTO_POINT_COST * 5 && (
+        {!isUnlimited && typeof pointsBalance === "number" && isFinite(pointsBalance) && pointsBalance < PHOTO_POINT_COST * 5 && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -177,11 +267,10 @@ export function Navbar({ onOpenLogin, onOpenSignup }: NavbarProps) {
         )}
       </header>
 
-      {/* Hamburger Drawer */}
+      {/* Drawer */}
       <AnimatePresence>
         {drawerOpen && (
           <>
-            {/* Backdrop */}
             <motion.div
               key="backdrop"
               initial={{ opacity: 0 }}
@@ -191,8 +280,6 @@ export function Navbar({ onOpenLogin, onOpenSignup }: NavbarProps) {
               className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
               onClick={() => setDrawerOpen(false)}
             />
-
-            {/* Drawer panel */}
             <motion.div
               key="drawer"
               initial={{ x: "100%" }}
@@ -201,7 +288,6 @@ export function Navbar({ onOpenLogin, onOpenSignup }: NavbarProps) {
               transition={{ type: "spring", stiffness: 320, damping: 30 }}
               className="fixed top-0 right-0 h-full w-72 z-50 bg-background/95 border-l border-border/60 backdrop-blur-xl flex flex-col shadow-2xl"
             >
-              {/* Drawer header */}
               <div className="flex items-center justify-between px-6 py-5 border-b border-border/40">
                 <div className="flex items-center gap-2">
                   <div className="w-7 h-7 rounded-md bg-gradient-to-tr from-primary to-secondary flex items-center justify-center">
@@ -217,17 +303,12 @@ export function Navbar({ onOpenLogin, onOpenSignup }: NavbarProps) {
                 </button>
               </div>
 
-              {/* Drawer links */}
               <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
                 {DRAWER_LINKS.map((link) => {
                   const Icon = link.icon;
                   const active = location === link.href;
                   return (
-                    <Link
-                      key={link.href}
-                      href={link.href}
-                      onClick={() => setDrawerOpen(false)}
-                    >
+                    <Link key={link.href} href={link.href} onClick={() => setDrawerOpen(false)}>
                       <div
                         className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
                           active
@@ -237,16 +318,13 @@ export function Navbar({ onOpenLogin, onOpenSignup }: NavbarProps) {
                       >
                         <Icon className="w-4 h-4 shrink-0" />
                         {link.label}
-                        {active && (
-                          <div className="ml-auto w-1.5 h-1.5 rounded-full bg-primary" />
-                        )}
+                        {active && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-primary" />}
                       </div>
                     </Link>
                   );
                 })}
               </nav>
 
-              {/* Drawer footer — user info or sign-in */}
               <div className="px-4 py-5 border-t border-border/40">
                 {user ? (
                   <div className="flex items-center gap-3 px-2">
@@ -258,9 +336,12 @@ export function Navbar({ onOpenLogin, onOpenSignup }: NavbarProps) {
                     </Avatar>
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium truncate">{user.name}</div>
-                      <div className="text-xs text-emerald-400">Unlimited access</div>
+                      <div className="text-xs text-muted-foreground truncate">{user.email}</div>
                     </div>
-                    <button onClick={() => { handleLogout(); setDrawerOpen(false); }} className="p-1.5 rounded-lg hover:bg-white/5 text-muted-foreground hover:text-foreground">
+                    <button
+                      onClick={() => { handleLogout(); setDrawerOpen(false); }}
+                      className="p-1.5 rounded-lg hover:bg-white/5 text-muted-foreground hover:text-foreground"
+                    >
                       <LogOut className="w-4 h-4" />
                     </button>
                   </div>

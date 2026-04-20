@@ -129,14 +129,32 @@ export default function PhotoGeneration() {
     }
   };
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (!result) return;
-    const a = document.createElement("a");
-    a.href = result;
-    a.download = `lumina-photo-${Date.now()}.jpg`;
-    a.target = "_blank";
-    a.click();
-    toast({ title: "Download started!" });
+    const filename = `lumina-photo-${Date.now()}.jpg`;
+    try {
+      const proxyUrl = `${import.meta.env.BASE_URL}api/download?url=${encodeURIComponent(result)}&filename=${filename}`;
+      const resp = await fetch(proxyUrl);
+      if (!resp.ok) throw new Error("proxy failed");
+      const blob = await resp.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+      toast({ title: "Downloaded!" });
+    } catch {
+      const a = document.createElement("a");
+      a.href = result;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      toast({ title: "Download started!" });
+    }
   };
 
   return (

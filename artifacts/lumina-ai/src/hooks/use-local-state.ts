@@ -44,6 +44,7 @@ export type User = {
   email: string;
   avatar?: string;
   provider?: "email" | "google";
+  plan?: "free" | "pro" | "premium" | "max" | "ultra";
 };
 
 export type HistoryItem = {
@@ -57,13 +58,22 @@ export type HistoryItem = {
 
 export type PointsData = {
   balance: number;
-  monthKey: string; // YYYY-MM to detect new month
+  monthKey: string;
 };
 
-// Points config
 export const FREE_POINTS_PER_MONTH = 250_000;
 export const PHOTO_POINT_COST = 1_000;
 export const VIDEO_POINT_COST = 2_000;
+
+export const VALID_COUPON = "Illusion@123";
+
+export const PLAN_LABELS: Record<string, string> = {
+  free: "Free",
+  pro: "Pro",
+  premium: "Premium",
+  max: "Max",
+  ultra: "Ultra",
+};
 
 function getCurrentMonthKey(): string {
   const now = new Date();
@@ -77,12 +87,14 @@ export function useAppState() {
     balance: FREE_POINTS_PER_MONTH,
     monthKey: getCurrentMonthKey(),
   });
+  const [appliedCoupon, setAppliedCoupon] = useLocalStorage<string>("lumina_coupon", "");
 
-  // Reset points at start of new month (for free users)
+  const couponUnlocked = appliedCoupon === VALID_COUPON;
+  const isUnlimited = !!user || couponUnlocked;
+
   const currentMonth = getCurrentMonthKey();
   const effectivePoints: PointsData = (() => {
-    if (!user && pointsData.monthKey !== currentMonth) {
-      // New month — reset
+    if (!isUnlimited && pointsData.monthKey !== currentMonth) {
       return { balance: FREE_POINTS_PER_MONTH, monthKey: currentMonth };
     }
     return pointsData;
@@ -98,7 +110,7 @@ export function useAppState() {
   };
 
   const spendPoints = (cost: number): boolean => {
-    if (user) return true; // signed in = unlimited
+    if (isUnlimited) return true;
     if (effectivePoints.balance < cost) return false;
     const updated = { balance: effectivePoints.balance - cost, monthKey: currentMonth };
     setPointsData(updated);
@@ -106,13 +118,21 @@ export function useAppState() {
   };
 
   const canGenerate = (cost: number) => {
-    if (user) return true;
+    if (isUnlimited) return true;
     return effectivePoints.balance >= cost;
   };
 
-  const pointsBalance = user ? Infinity : effectivePoints.balance;
-  const pointsUsed = user ? 0 : FREE_POINTS_PER_MONTH - effectivePoints.balance;
-  const pointsPercent = user ? 0 : Math.min((pointsUsed / FREE_POINTS_PER_MONTH) * 100, 100);
+  const applyCoupon = (code: string): boolean => {
+    if (code === VALID_COUPON) {
+      setAppliedCoupon(code);
+      return true;
+    }
+    return false;
+  };
+
+  const pointsBalance = isUnlimited ? Infinity : effectivePoints.balance;
+  const pointsUsed = isUnlimited ? 0 : FREE_POINTS_PER_MONTH - effectivePoints.balance;
+  const pointsPercent = isUnlimited ? 0 : Math.min((pointsUsed / FREE_POINTS_PER_MONTH) * 100, 100);
 
   return {
     user,
@@ -125,5 +145,9 @@ export function useAppState() {
     pointsPercent,
     spendPoints,
     canGenerate,
+    isUnlimited,
+    couponUnlocked,
+    appliedCoupon,
+    applyCoupon,
   };
 }
