@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Check, Zap, Crown, Star, Flame, Sparkles, Tag } from "lucide-react";
+import { Check, Zap, Crown, Star, Flame, Sparkles, Tag, CheckCircle, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAppState, VALID_COUPON } from "@/hooks/use-local-state";
 import { useToast } from "@/hooks/use-toast";
+import { useSearch } from "wouter";
 
 const PLANS = [
   {
@@ -126,10 +127,23 @@ const PLANS = [
 ];
 
 export default function Pricing() {
-  const { applyCoupon, couponUnlocked, appliedCoupon } = useAppState();
+  const { applyCoupon, couponUnlocked } = useAppState();
   const { toast } = useToast();
+  const search = useSearch();
+  const params = new URLSearchParams(search);
+
   const [coupon, setCoupon] = useState("");
   const [applying, setApplying] = useState(false);
+  const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (params.get("success") === "1") {
+      toast({ title: "Payment successful!", description: `Your ${params.get("plan") ?? ""} plan is now active.` });
+    }
+    if (params.get("cancelled") === "1") {
+      toast({ title: "Payment cancelled", description: "No charge was made.", variant: "destructive" });
+    }
+  }, []);
 
   const handleApplyCoupon = () => {
     if (!coupon.trim()) return;
@@ -137,13 +151,38 @@ export default function Pricing() {
     setTimeout(() => {
       const success = applyCoupon(coupon.trim());
       if (success) {
-        toast({ title: "Coupon applied!", description: "You now have unlimited access. Enjoy Lumina AI!" });
+        toast({ title: "Coupon applied!", description: "Unlimited access is now active. Enjoy Lumina AI!" });
         setCoupon("");
       } else {
         toast({ title: "Invalid coupon", description: "The code you entered is not valid.", variant: "destructive" });
       }
       setApplying(false);
     }, 800);
+  };
+
+  const handleCheckout = async (planId: string) => {
+    setCheckoutLoading(planId);
+    try {
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ planId }),
+      });
+      const data = await res.json() as { url?: string; error?: string };
+      if (!res.ok || !data.url) {
+        toast({
+          title: "Checkout unavailable",
+          description: data.error ?? "Stripe is not configured yet. Please contact support.",
+          variant: "destructive",
+        });
+        return;
+      }
+      window.location.href = data.url;
+    } catch {
+      toast({ title: "Network error", description: "Could not connect to payment system.", variant: "destructive" });
+    } finally {
+      setCheckoutLoading(null);
+    }
   };
 
   return (
@@ -161,26 +200,15 @@ export default function Pricing() {
           Simple, <span className="gradient-text">transparent</span> pricing
         </h1>
         <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-          Start free with 250k points per month. Upgrade anytime for more power, more models, and more creative freedom.
+          Start free with 50 photos and 10 videos per month. Sign up for 250k points. Upgrade anytime for more power.
         </p>
       </motion.div>
-
-      {/* Coupon redeemed banner */}
-      {couponUnlocked && (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="mb-8 p-4 rounded-2xl bg-gradient-to-r from-primary/20 to-accent/20 border border-primary/30 flex items-center justify-center gap-3 text-sm font-medium"
-        >
-          <Sparkles className="w-5 h-5 text-primary" />
-          Coupon <span className="font-mono text-primary">{appliedCoupon}</span> is active — you have unlimited access!
-        </motion.div>
-      )}
 
       {/* Plans grid */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5 mb-16">
         {PLANS.map((plan, i) => {
           const Icon = plan.icon;
+          const isLoading = checkoutLoading === plan.id;
           return (
             <motion.div
               key={plan.id}
@@ -218,15 +246,18 @@ export default function Pricing() {
               </ul>
 
               <Button
+                onClick={() => !plan.disabled && handleCheckout(plan.id)}
+                disabled={plan.disabled || isLoading}
                 className={`w-full text-sm font-semibold ${
                   plan.disabled
                     ? "bg-white/5 text-muted-foreground cursor-default border border-white/10"
                     : `bg-gradient-to-r ${plan.color} text-white hover:opacity-90`
                 }`}
-                disabled={plan.disabled}
                 variant={plan.disabled ? "ghost" : "default"}
               >
-                {plan.cta}
+                {isLoading ? (
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : plan.cta}
               </Button>
             </motion.div>
           );
@@ -247,23 +278,29 @@ export default function Pricing() {
         <p className="text-sm text-muted-foreground mb-4">
           Enter your code below to unlock special access.
         </p>
-        <div className="flex gap-2">
-          <Input
-            placeholder="Enter coupon code..."
-            value={coupon}
-            onChange={(e) => setCoupon(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleApplyCoupon()}
-            className="bg-background/50 border-white/10 focus:border-primary font-mono"
-            disabled={couponUnlocked}
-          />
-          <Button
-            onClick={handleApplyCoupon}
-            disabled={!coupon.trim() || applying || couponUnlocked}
-            className="bg-primary hover:bg-primary/90 text-white px-5 shrink-0"
-          >
-            {applying ? "..." : couponUnlocked ? "Applied" : "Apply"}
-          </Button>
-        </div>
+        {couponUnlocked ? (
+          <div className="flex items-center justify-center gap-2 py-3 text-emerald-400 font-medium text-sm">
+            <CheckCircle className="w-5 h-5" />
+            Coupon active — unlimited access unlocked!
+          </div>
+        ) : (
+          <div className="flex gap-2">
+            <Input
+              placeholder="Enter coupon code..."
+              value={coupon}
+              onChange={(e) => setCoupon(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleApplyCoupon()}
+              className="bg-background/50 border-white/10 focus:border-primary font-mono"
+            />
+            <Button
+              onClick={handleApplyCoupon}
+              disabled={!coupon.trim() || applying}
+              className="bg-primary hover:bg-primary/90 text-white px-5 shrink-0"
+            >
+              {applying ? "..." : "Apply"}
+            </Button>
+          </div>
+        )}
       </motion.div>
     </div>
   );

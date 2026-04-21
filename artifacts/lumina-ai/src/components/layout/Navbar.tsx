@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { Sparkles, LogOut, Menu, X, Zap, History, Info, Mail, BookOpen, Briefcase, DollarSign, ChevronDown, User, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useAppState, FREE_POINTS_PER_MONTH, PHOTO_POINT_COST } from "@/hooks/use-local-state";
+import { useAppState } from "@/hooks/use-local-state";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { AnimatePresence, motion } from "framer-motion";
@@ -32,7 +32,7 @@ function getCurrentMonthLabel() {
 
 export function Navbar({ onOpenLogin, onOpenSignup }: NavbarProps) {
   const [location] = useLocation();
-  const { user, setUser, pointsBalance, pointsPercent, pointsUsed, isUnlimited, couponUnlocked } = useAppState();
+  const { user, setUser, pointsBalance, pointsPercent, isUnlimited, guestPhotoRemaining, guestVideoRemaining } = useAppState();
   const { toast } = useToast();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -92,24 +92,32 @@ export function Navbar({ onOpenLogin, onOpenSignup }: NavbarProps) {
 
           {/* Right side */}
           <div className="flex items-center gap-2 shrink-0">
-            {/* Points badge for free users */}
+            {/* Usage badge */}
             {!isUnlimited && (
               <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs">
                 <Zap className="w-3.5 h-3.5 text-primary" />
-                <div className="flex items-center gap-1.5">
-                  <span className="font-medium">
-                    {typeof pointsBalance === "number" && isFinite(pointsBalance)
-                      ? `${(pointsBalance / 1000).toFixed(0)}k`
-                      : "∞"}
-                  </span>
-                  <span className="text-muted-foreground">pts</span>
-                  <div className="w-12 h-1 bg-white/10 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-primary to-secondary rounded-full transition-all"
-                      style={{ width: `${Math.max(0, 100 - pointsPercent)}%` }}
-                    />
+                {user ? (
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-medium">
+                      {typeof pointsBalance === "number" && isFinite(pointsBalance)
+                        ? `${(pointsBalance / 1000).toFixed(0)}k`
+                        : "∞"}
+                    </span>
+                    <span className="text-muted-foreground">pts</span>
+                    <div className="w-12 h-1 bg-white/10 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-primary to-secondary rounded-full transition-all"
+                        style={{ width: `${Math.max(0, 100 - pointsPercent)}%` }}
+                      />
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <span><span className="text-primary font-medium">{guestPhotoRemaining}</span> photos</span>
+                    <span className="opacity-40">·</span>
+                    <span><span className="text-secondary font-medium">{guestVideoRemaining}</span> videos</span>
+                  </div>
+                )}
               </div>
             )}
 
@@ -256,7 +264,7 @@ export function Navbar({ onOpenLogin, onOpenSignup }: NavbarProps) {
         </div>
 
         {/* Low-points warning */}
-        {!isUnlimited && typeof pointsBalance === "number" && isFinite(pointsBalance) && pointsBalance < PHOTO_POINT_COST * 5 && (
+        {!isUnlimited && !user && guestPhotoRemaining < 5 && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}

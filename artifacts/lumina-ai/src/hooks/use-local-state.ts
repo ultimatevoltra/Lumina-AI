@@ -18,9 +18,7 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
         window.localStorage.setItem(key, JSON.stringify(valueToStore));
         window.dispatchEvent(new Event("local-storage"));
       }
-    } catch {
-      // ignore
-    }
+    } catch { }
   };
 
   useEffect(() => {
@@ -28,9 +26,7 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
       try {
         const item = window.localStorage.getItem(key);
         if (item) setStoredValue(JSON.parse(item));
-      } catch {
-        // ignore
-      }
+      } catch { }
     };
     window.addEventListener("local-storage", handleStorageChange);
     return () => window.removeEventListener("local-storage", handleStorageChange);
@@ -39,12 +35,14 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
   return [storedValue, setValue] as const;
 }
 
+export type Plan = "free" | "pro" | "premium" | "max" | "ultra";
+
 export type User = {
   name: string;
   email: string;
   avatar?: string;
   provider?: "email" | "google";
-  plan?: "free" | "pro" | "premium" | "max" | "ultra";
+  plan?: Plan;
 };
 
 export type HistoryItem = {
@@ -56,18 +54,29 @@ export type HistoryItem = {
   timestamp: number;
 };
 
-export type PointsData = {
-  balance: number;
+// ── Guest limits (no account) ──────────────────────────────────────────────
+export const MAX_GUEST_PHOTOS = 50;
+export const MAX_GUEST_VIDEOS = 10;
+
+type GuestUsage = {
+  photoCount: number;
+  videoCount: number;
   monthKey: string;
 };
 
-export const FREE_POINTS_PER_MONTH = 250_000;
+// ── Signed-in plan limits ──────────────────────────────────────────────────
+export const PLAN_MONTHLY_POINTS: Record<Plan, number> = {
+  free:    250_000,
+  pro:   2_000_000,
+  premium: 5_000_000,
+  max:  15_000_000,
+  ultra:   Infinity,
+};
+
 export const PHOTO_POINT_COST = 1_000;
 export const VIDEO_POINT_COST = 2_000;
 
-export const VALID_COUPON = "Illusion@123";
-
-export const PLAN_LABELS: Record<string, string> = {
+export const PLAN_LABELS: Record<Plan, string> = {
   free: "Free",
   pro: "Pro",
   premium: "Premium",
@@ -75,51 +84,98 @@ export const PLAN_LABELS: Record<string, string> = {
   ultra: "Ultra",
 };
 
-function getCurrentMonthKey(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+export const VALID_COUPON = "Illusion@123";
+
+type PointsData = {
+  balance: number;
+  monthKey: string;
+};
+
+function currentMonthKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
 export function useAppState() {
   const [user, setUser] = useLocalStorage<User | null>("lumina_user", null);
   const [history, setHistory] = useLocalStorage<HistoryItem[]>("lumina_history", []);
+
+  // Signed-in points balance
   const [pointsData, setPointsData] = useLocalStorage<PointsData>("lumina_points", {
-    balance: FREE_POINTS_PER_MONTH,
-    monthKey: getCurrentMonthKey(),
+    balance: PLAN_MONTHLY_POINTS["free"],
+    monthKey: currentMonthKey(),
   });
+
+  // Guest usage counts
+  const [guestUsage, setGuestUsage] = useLocalStorage<GuestUsage>("lumina_guest", {
+    photoCount: 0,
+    videoCount: 0,
+    monthKey: currentMonthKey(),
+  });
+
+  // Coupon
   const [appliedCoupon, setAppliedCoupon] = useLocalStorage<string>("lumina_coupon", "");
-
   const couponUnlocked = appliedCoupon === VALID_COUPON;
-  const isUnlimited = !!user || couponUnlocked;
 
-  const currentMonth = getCurrentMonthKey();
+  const month = currentMonthKey();
+
+  // Reset guest usage on new month
+  const effectiveGuest: GuestUsage =
+    guestUsage.monthKey !== month
+      ? { photoCount: 0, videoCount: 0, monthKey: month }
+      : guestUsage;
+
+  // Reset signed-in points on new month (or plan change)
+  const planLimit = PLAN_MONTHLY_POINTS[user?.plan ?? "free"] ?? PLAN_MONTHLY_POINTS["free"];
+  const isUnlimited = couponUnlocked || user?.plan === "ultra";
+
   const effectivePoints: PointsData = (() => {
-    if (!isUnlimited && pointsData.monthKey !== currentMonth) {
-      return { balance: FREE_POINTS_PER_MONTH, monthKey: currentMonth };
+    if (!user) return pointsData; // not used for guests
+    if (pointsData.monthKey !== month) {
+      return { balance: planLimit === Infinity ? Number.MAX_SAFE_INTEGER : planLimit, monthKey: month };
     }
     return pointsData;
   })();
 
+  // ── Helpers ──────────────────────────────────────────────────────────────
+
   const addHistory = (item: Omit<HistoryItem, "id" | "timestamp">) => {
-    const newItem: HistoryItem = {
-      ...item,
-      id: crypto.randomUUID(),
-      timestamp: Date.now(),
-    };
+    const newItem: HistoryItem = { ...item, id: crypto.randomUUID(), timestamp: Date.now() };
     setHistory((prev) => [newItem, ...prev]);
   };
 
-  const spendPoints = (cost: number): boolean => {
+  /** Can the user generate something of this type? */
+  const canGenerate = (type: "photo" | "video"): boolean => {
     if (isUnlimited) return true;
-    if (effectivePoints.balance < cost) return false;
-    const updated = { balance: effectivePoints.balance - cost, monthKey: currentMonth };
-    setPointsData(updated);
-    return true;
+    if (user) {
+      // Points-based for signed users
+      const cost = type === "photo" ? PHOTO_POINT_COST : VIDEO_POINT_COST;
+      return effectivePoints.balance >= cost;
+    }
+    // Count-based for guests
+    if (type === "photo") return effectiveGuest.photoCount < MAX_GUEST_PHOTOS;
+    return effectiveGuest.videoCount < MAX_GUEST_VIDEOS;
   };
 
-  const canGenerate = (cost: number) => {
+  /** Deduct cost. Returns false if insufficient. */
+  const spendPoints = (type: "photo" | "video"): boolean => {
     if (isUnlimited) return true;
-    return effectivePoints.balance >= cost;
+    if (user) {
+      const cost = type === "photo" ? PHOTO_POINT_COST : VIDEO_POINT_COST;
+      if (effectivePoints.balance < cost) return false;
+      setPointsData({ balance: effectivePoints.balance - cost, monthKey: month });
+      return true;
+    }
+    // Guest
+    if (type === "photo") {
+      if (effectiveGuest.photoCount >= MAX_GUEST_PHOTOS) return false;
+      setGuestUsage({ ...effectiveGuest, photoCount: effectiveGuest.photoCount + 1, monthKey: month });
+      return true;
+    } else {
+      if (effectiveGuest.videoCount >= MAX_GUEST_VIDEOS) return false;
+      setGuestUsage({ ...effectiveGuest, videoCount: effectiveGuest.videoCount + 1, monthKey: month });
+      return true;
+    }
   };
 
   const applyCoupon = (code: string): boolean => {
@@ -130,9 +186,14 @@ export function useAppState() {
     return false;
   };
 
-  const pointsBalance = isUnlimited ? Infinity : effectivePoints.balance;
-  const pointsUsed = isUnlimited ? 0 : FREE_POINTS_PER_MONTH - effectivePoints.balance;
-  const pointsPercent = isUnlimited ? 0 : Math.min((pointsUsed / FREE_POINTS_PER_MONTH) * 100, 100);
+  // Derived display values for signed users
+  const pointsBalance = !user ? null : isUnlimited ? Infinity : effectivePoints.balance;
+  const pointsUsed = !user ? null : planLimit === Infinity ? 0 : planLimit - (effectivePoints.balance ?? planLimit);
+  const pointsPercent = !user || planLimit === Infinity ? 0 : Math.min(((pointsUsed ?? 0) / planLimit) * 100, 100);
+
+  // Guest remaining counts
+  const guestPhotoRemaining = MAX_GUEST_PHOTOS - effectiveGuest.photoCount;
+  const guestVideoRemaining = MAX_GUEST_VIDEOS - effectiveGuest.videoCount;
 
   return {
     user,
@@ -140,14 +201,17 @@ export function useAppState() {
     history,
     setHistory,
     addHistory,
-    pointsBalance,
-    pointsUsed,
-    pointsPercent,
-    spendPoints,
     canGenerate,
+    spendPoints,
     isUnlimited,
     couponUnlocked,
     appliedCoupon,
     applyCoupon,
+    pointsBalance,
+    pointsUsed,
+    pointsPercent,
+    guestPhotoRemaining,
+    guestVideoRemaining,
+    planLimit,
   };
 }

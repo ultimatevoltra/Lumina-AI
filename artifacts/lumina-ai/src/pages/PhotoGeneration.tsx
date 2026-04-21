@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { Sparkles, Image as ImageIcon, Lock, Download, Share2, Maximize2, Loader2, Zap, Shuffle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { useAppState, PHOTO_POINT_COST, FREE_POINTS_PER_MONTH } from "@/hooks/use-local-state";
+import { useAppState } from "@/hooks/use-local-state";
 import { useToast } from "@/hooks/use-toast";
 
 // Pollinations.ai model name for each model ID
@@ -41,7 +41,7 @@ const RANDOM_PROMPTS = [
 ];
 
 export default function PhotoGeneration() {
-  const { user, addHistory, spendPoints, canGenerate, pointsBalance } = useAppState();
+  const { user, addHistory, spendPoints, canGenerate, guestPhotoRemaining, isUnlimited, pointsBalance } = useAppState();
   const { toast } = useToast();
 
   const [prompt, setPrompt] = useState("");
@@ -81,10 +81,10 @@ export default function PhotoGeneration() {
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
 
-    if (!canGenerate(PHOTO_POINT_COST)) {
+    if (!canGenerate("photo")) {
       toast({
-        title: "Not enough points",
-        description: `You need ${PHOTO_POINT_COST.toLocaleString()} points. Sign in for unlimited access.`,
+        title: "Limit reached",
+        description: `You've used all 50 free photos this month. Sign up for 250k monthly points!`,
         variant: "destructive",
       });
       return;
@@ -93,7 +93,7 @@ export default function PhotoGeneration() {
     setIsGenerating(true);
     setResult(null);
 
-    const spent = spendPoints(PHOTO_POINT_COST);
+    const spent = spendPoints("photo");
     if (!spent) { setIsGenerating(false); return; }
 
     try {
@@ -133,7 +133,7 @@ export default function PhotoGeneration() {
     if (!result) return;
     const filename = `lumina-photo-${Date.now()}.jpg`;
     try {
-      const proxyUrl = `${import.meta.env.BASE_URL}api/download?url=${encodeURIComponent(result)}&filename=${filename}`;
+      const proxyUrl = `/api/download?url=${encodeURIComponent(result)}&filename=${filename}`;
       const resp = await fetch(proxyUrl);
       if (!resp.ok) throw new Error("proxy failed");
       const blob = await resp.blob();
@@ -175,17 +175,26 @@ export default function PhotoGeneration() {
           </div>
         </div>
 
-        {!user && (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground mt-3">
-            <Zap className="w-3.5 h-3.5 text-primary" />
+        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-3">
+          <Zap className="w-3.5 h-3.5 text-primary" />
+          {isUnlimited ? (
+            <span className="text-emerald-400 font-medium">Unlimited generations active</span>
+          ) : user ? (
             <span>
-              {typeof pointsBalance === "number" && isFinite(pointsBalance)
-                ? `${pointsBalance.toLocaleString()} / ${FREE_POINTS_PER_MONTH.toLocaleString()}`
-                : "Unlimited"}{" "}
-              points remaining — each photo costs {PHOTO_POINT_COST.toLocaleString()} pts
+              <span className="text-primary font-medium">
+                {typeof pointsBalance === "number" && isFinite(pointsBalance) ? pointsBalance.toLocaleString() : "∞"}
+              </span>
+              {" "}pts remaining this month
             </span>
-          </div>
-        )}
+          ) : (
+            <span>
+              <span className={guestPhotoRemaining < 5 ? "text-destructive font-medium" : "text-primary font-medium"}>
+                {guestPhotoRemaining}
+              </span>
+              {" "}/ 50 free photos remaining — sign up for 250k monthly points
+            </span>
+          )}
+        </div>
       </motion.div>
 
       <div className="grid lg:grid-cols-2 gap-8">
@@ -201,12 +210,10 @@ export default function PhotoGeneration() {
               <label className="text-sm font-medium text-muted-foreground">Your prompt</label>
               <button
                 onClick={fillRandomPrompt}
-                title="Random prompt (press R)"
                 className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors px-2 py-1 rounded-lg hover:bg-primary/10"
               >
                 <Shuffle className="w-3.5 h-3.5" />
                 Random
-                <kbd className="ml-0.5 text-[10px] px-1 py-0.5 rounded bg-white/10 border border-white/10 font-mono">R</kbd>
               </button>
             </div>
             <Textarea
@@ -220,7 +227,7 @@ export default function PhotoGeneration() {
                 if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) handleGenerate();
               }}
             />
-            <p className="text-xs text-muted-foreground/50 mt-2">Ctrl+Enter to generate · R for random prompt</p>
+            <p className="text-xs text-muted-foreground/50 mt-2">Ctrl+Enter to generate</p>
           </div>
 
           <div className="glass-card rounded-2xl p-6">

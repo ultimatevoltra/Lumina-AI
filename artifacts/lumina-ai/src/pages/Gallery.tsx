@@ -24,7 +24,7 @@ export default function Gallery() {
     const ext = type === "video" ? "mp4" : "jpg";
     const filename = `lumina-${type}-${Date.now()}.${ext}`;
     try {
-      const proxyUrl = `${import.meta.env.BASE_URL}api/download?url=${encodeURIComponent(url)}&filename=${filename}`;
+      const proxyUrl = `/api/download?url=${encodeURIComponent(url)}&filename=${filename}`;
       const resp = await fetch(proxyUrl);
       if (!resp.ok) throw new Error("proxy failed");
       const blob = await resp.blob();

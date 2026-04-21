@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { Video, Lock, Download, Loader2, Zap, Film, Shuffle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { useAppState, VIDEO_POINT_COST, FREE_POINTS_PER_MONTH } from "@/hooks/use-local-state";
+import { useAppState } from "@/hooks/use-local-state";
 import { useToast } from "@/hooks/use-toast";
 
 const VIDEO_MODELS = [
@@ -41,7 +41,7 @@ const RANDOM_PROMPTS = [
 ];
 
 export default function VideoGeneration() {
-  const { user, addHistory, spendPoints, canGenerate, pointsBalance } = useAppState();
+  const { user, addHistory, spendPoints, canGenerate, guestVideoRemaining, isUnlimited, pointsBalance } = useAppState();
   const { toast } = useToast();
 
   const [prompt, setPrompt] = useState("");
@@ -82,10 +82,10 @@ export default function VideoGeneration() {
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
 
-    if (!canGenerate(VIDEO_POINT_COST)) {
+    if (!canGenerate("video")) {
       toast({
-        title: "Not enough points",
-        description: `Videos cost ${VIDEO_POINT_COST.toLocaleString()} points. Sign in for unlimited access.`,
+        title: "Limit reached",
+        description: `You've used all 10 free videos this month. Sign up for 250k monthly points!`,
         variant: "destructive",
       });
       return;
@@ -96,7 +96,7 @@ export default function VideoGeneration() {
     setLoadingStep(0);
     setProgress(5);
 
-    const spent = spendPoints(VIDEO_POINT_COST);
+    const spent = spendPoints("video");
     if (!spent) { setIsGenerating(false); return; }
 
     // Animate progress while waiting (steps every 12s since polling is 30 attempts × 3s = 90s max)
@@ -152,7 +152,7 @@ export default function VideoGeneration() {
     if (!result) return;
     const filename = resultFilename || `lumina-video-${Date.now()}.mp4`;
     try {
-      const proxyUrl = `${import.meta.env.BASE_URL}api/download?url=${encodeURIComponent(result)}&filename=${filename}`;
+      const proxyUrl = `/api/download?url=${encodeURIComponent(result)}&filename=${filename}`;
       const resp = await fetch(proxyUrl);
       if (!resp.ok) throw new Error("proxy failed");
       const blob = await resp.blob();
@@ -194,17 +194,26 @@ export default function VideoGeneration() {
           </div>
         </div>
 
-        {!user && (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground mt-3">
-            <Zap className="w-3.5 h-3.5 text-secondary" />
+        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-3">
+          <Zap className="w-3.5 h-3.5 text-secondary" />
+          {isUnlimited ? (
+            <span className="text-emerald-400 font-medium">Unlimited generations active</span>
+          ) : user ? (
             <span>
-              {typeof pointsBalance === "number" && isFinite(pointsBalance)
-                ? `${pointsBalance.toLocaleString()} / ${FREE_POINTS_PER_MONTH.toLocaleString()}`
-                : "Unlimited"}{" "}
-              points remaining — each video costs {VIDEO_POINT_COST.toLocaleString()} pts
+              <span className="text-primary font-medium">
+                {typeof pointsBalance === "number" && isFinite(pointsBalance) ? pointsBalance.toLocaleString() : "∞"}
+              </span>
+              {" "}pts remaining this month
             </span>
-          </div>
-        )}
+          ) : (
+            <span>
+              <span className={guestVideoRemaining < 3 ? "text-destructive font-medium" : "text-secondary font-medium"}>
+                {guestVideoRemaining}
+              </span>
+              {" "}/ 10 free videos remaining — sign up for 250k monthly points
+            </span>
+          )}
+        </div>
       </motion.div>
 
       <div className="grid lg:grid-cols-2 gap-8">
@@ -220,12 +229,10 @@ export default function VideoGeneration() {
               <label className="text-sm font-medium text-muted-foreground">Your prompt</label>
               <button
                 onClick={fillRandomPrompt}
-                title="Random prompt (press R)"
                 className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-secondary transition-colors px-2 py-1 rounded-lg hover:bg-secondary/10"
               >
                 <Shuffle className="w-3.5 h-3.5" />
                 Random
-                <kbd className="ml-0.5 text-[10px] px-1 py-0.5 rounded bg-white/10 border border-white/10 font-mono">R</kbd>
               </button>
             </div>
             <Textarea
@@ -239,7 +246,7 @@ export default function VideoGeneration() {
                 if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) handleGenerate();
               }}
             />
-            <p className="text-xs text-muted-foreground/50 mt-2">Ctrl+Enter to generate · R for random prompt · ~30–60 sec wait</p>
+            <p className="text-xs text-muted-foreground/50 mt-2">Ctrl+Enter to generate · ~30–60 sec wait</p>
           </div>
 
           <div className="glass-card rounded-2xl p-6">

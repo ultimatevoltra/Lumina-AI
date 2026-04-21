@@ -2,13 +2,13 @@ import { motion } from "framer-motion";
 import { Link } from "wouter";
 import { Sparkles, Image as ImageIcon, Film, FolderOpen, Zap, Shield, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useAppState, FREE_POINTS_PER_MONTH, PHOTO_POINT_COST, VIDEO_POINT_COST } from "@/hooks/use-local-state";
+import { useAppState } from "@/hooks/use-local-state";
 
 const FEATURES = [
   {
     icon: Zap,
-    title: "250k Points Free",
-    description: `Every month you get ${(FREE_POINTS_PER_MONTH / 1000).toLocaleString()}k points. Each image uses ${PHOTO_POINT_COST / 1000}k points — that's up to 250 photos free.`,
+    title: "Free Every Month",
+    description: "No account? Get 50 free photos and 10 free videos each month. Sign up for 250k monthly points — that's up to 250 images.",
     gradient: "from-primary to-primary/50",
     glow: "rgba(99,102,241,0.3)",
   },
@@ -22,7 +22,7 @@ const FEATURES = [
   {
     icon: Clock,
     title: "Monthly Reset",
-    description: "Points reset every month automatically. Sign in for completely unlimited generations with no caps.",
+    description: "Usage resets every month automatically. Upgrade to Pro, Max, or Ultra for millions of points per month.",
     gradient: "from-accent to-accent/50",
     glow: "rgba(6,182,212,0.3)",
   },
@@ -62,7 +62,7 @@ export default function Home() {
           className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed"
         >
           Transform your words into stunning AI-generated photos and cinematic videos.
-          {user ? " Welcome back — your generations are unlimited." : ` Free users get ${(FREE_POINTS_PER_MONTH / 1000).toLocaleString()}k points every month.`}
+          {user ? " Welcome back — your 250k monthly points are ready." : " No account needed — 50 free photos and 10 free videos every month."}
         </motion.p>
 
         <motion.div
@@ -133,7 +133,7 @@ export default function Home() {
               Turn text into stunning, high-resolution AI photos. Choose from 6 models including Stable XL, DALL·E 3, and Midjourney.
             </p>
             <div className="mt-4 text-xs text-primary font-medium">
-              {PHOTO_POINT_COST.toLocaleString()} pts per image →
+              1,000 pts per image →
             </div>
           </div>
         </Link>
@@ -148,7 +148,7 @@ export default function Home() {
               Bring your imagination to life with cinematic AI-generated videos. Powered by Lumina 2.5 Pro, Runway, Pika, and more.
             </p>
             <div className="mt-4 text-xs text-secondary font-medium">
-              {VIDEO_POINT_COST.toLocaleString()} pts per video →
+              2,000 pts per video →
             </div>
           </div>
         </Link>
